@@ -1,0 +1,21 @@
+{
+  "name": "apm-fashion-token",
+  "version": "1.0.0",
+  "description": "apM Fashion (APM) - fixed-supply, ownerless BEP-20 token with cliff-vesting wallets.",
+  "license": "MIT",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:bscTestnet": "hardhat run scripts/deploy.ts --network bscTestnet",
+    "deploy:bsc": "hardhat run scripts/deploy.ts --network bsc"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "5.0.0",
+    "@openzeppelin/contracts": "5.6.1",
+    "@types/node": "20.14.10",
+    "dotenv": "16.4.5",
+    "hardhat": "2.28.6",
+    "ts-node": "10.9.2",
+    "typescript": "5.4.5"
+  }
+}
