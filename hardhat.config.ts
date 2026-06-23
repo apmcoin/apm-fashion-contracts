@@ -5,7 +5,6 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY || "";
-const BSCSCAN_API_KEY = process.env.BSCSCAN_API_KEY || "";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -25,13 +24,6 @@ const config: HardhatUserConfig = {
       url: process.env.BSC_RPC || "https://bsc-dataseed.bnbchain.org",
       chainId: 56,
       accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
-    },
-  },
-  etherscan: {
-    // hardhat-verify uses built-in bsc/bscTestnet chain configs
-    apiKey: {
-      bsc: BSCSCAN_API_KEY,
-      bscTestnet: BSCSCAN_API_KEY,
     },
   },
 };

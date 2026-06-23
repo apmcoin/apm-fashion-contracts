@@ -6,6 +6,8 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
+    "flatten": "hardhat flatten contracts/ApmFashion.sol > flattened/ApmFashion.sol",
+    "build": "hardhat compile && npm run flatten",
     "deploy:bscTestnet": "hardhat run scripts/deploy.ts --network bscTestnet",
     "deploy:bsc": "hardhat run scripts/deploy.ts --network bsc"
   },

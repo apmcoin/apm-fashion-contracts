@@ -1,31 +1,34 @@
 # apM Fashion Contracts
 
-Smart contracts for apM Fashion. Currently a fixed-supply token and cliff-vesting wallets;
-more contracts will be added over time.
+Smart contracts for apM Fashion. More contracts will be added over time.
 
 ## Contracts
 
-- **ApmFashion** — `ERC20` + `ERC20Permit`. Fixed supply of 10,000,000,000 APM (18 decimals),
-  minted once in the constructor to the addresses passed as arguments. No owner, no minting
-  after deployment, no pause, no blacklist. `name` and `symbol` are immutable.
-  This is the only custom contract (the sole audit target).
+- **ApmFashion** — the only contract deployed and the sole audit target. `ERC20` + `ERC20Permit`
+  (both imported from OpenZeppelin). Fixed supply of 10,000,000,000 APM (18 decimals), minted once
+  in the constructor. No owner, no minting after deployment, no pause, no blacklist. `name` and
+  `symbol` are immutable. A standard ERC20 — no transfer restrictions.
 
-Vesting uses OpenZeppelin's stock **`VestingWallet`** directly — no custom vesting code.
-Schedules are expressed purely via `(start, duration)`:
+  The constructor mints the whole supply in one transaction:
+  - **locked tranches** are minted into freshly deployed OpenZeppelin `VestingWallet` instances
+    (imported and created with `new`), one per beneficiary, with per-tranche `(start, duration)`.
+  - **free tranches** are minted directly to the given addresses (e.g. exchange).
 
-- pure linear: `start = TGE`, `duration = linear period`
-- cliff + linear: `start = TGE + cliff`, `duration = linear period`
+  All vesting math lives in OpenZeppelin `VestingWallet` (imported). The token adds **no custom
+  vesting logic** — only argument forwarding and the `sum == TOTAL_SUPPLY` invariant.
+
+Schedule per tranche via `(start, duration)`:
+
+- pure linear: `start = TGE`, `duration = period`
+- cliff + linear: `start = TGE + cliff`, `duration = period`
 - pure cliff (full unlock): `start = TGE + cliff`, `duration = 0`
-
-`contracts/Imports.sol` is a one-line shim that pulls `VestingWallet` into the build so Hardhat
-produces its artifact for deployment. (For a cliff *inside* the total period, OZ's
-`VestingWalletCliff` covers it — still no custom code.)
 
 ## Stack
 
 - Solidity 0.8.27, optimizer (200 runs), evmVersion `cancun`
 - `@openzeppelin/contracts` 5.6.1 (exact pin; reproducibility via `package-lock.json`)
-- Hardhat 2.28.6, `hardhat-toolbox` 5.0.0, `hardhat-verify`
+- Hardhat 2.28.6, `hardhat-toolbox` 5.0.0
+- Explorer verification via the committed `flattened/ApmFashion.sol` (regenerate with `npm run build`)
 
 ## Usage
 
@@ -33,8 +36,9 @@ produces its artifact for deployment. (For a cliff *inside* the total period, OZ
 npm install
 npm run compile
 npm test
+npm run build          # compile + (re)generate flattened/ApmFashion.sol
 
-cp .env.example .env   # fill DEPLOYER_PRIVATE_KEY / BSCSCAN_API_KEY
+cp .env.example .env   # fill DEPLOYER_PRIVATE_KEY
 npm run deploy:bscTestnet
 npm run deploy:bsc
 ```
@@ -42,5 +46,6 @@ npm run deploy:bsc
 ## Notes
 
 - Allocations and vesting schedules are deployment arguments — set them in `scripts/deploy.ts`.
+- Source comments are ASCII-only to avoid any verification encoding mismatch.
 - Token logos are registered off-chain (BscScan, token lists); ERC-20 has no logo field.
 - Confirm the on-chain `symbol` matches the exchange listing ticker before deploying (immutable).

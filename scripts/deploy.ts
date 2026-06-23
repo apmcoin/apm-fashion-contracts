@@ -1,26 +1,23 @@
 import { ethers, network } from "hardhat";
 
 /**
- * apM Fashion deployment.
+ * apM Fashion deployment - a single transaction.
  *
- * Vesting uses OpenZeppelin's stock VestingWallet (no custom contract). Each schedule is
- * expressed purely via (start, duration):
- *   - pure linear:        start = TGE,          duration = linear period
- *   - cliff + linear:     start = TGE + cliff,  duration = linear period
- *   - pure cliff (full):  start = TGE + cliff,  duration = 0  (unlocks 100% at start)
+ * ApmFashion's constructor deploys one OpenZeppelin VestingWallet per locked tranche and mints
+ * into it, then mints the free tranches directly. The whole genesis is one deploy of one contract.
  *
- * Flow:
- *   1) Deploy one VestingWallet per locked allocation (beneficiary = cold wallet).
- *   2) Deploy ApmFashion, minting the full 10,000,000,000 supply across the vesting
- *      contracts and cold-wallet EOAs. The constructor enforces sum == TOTAL_SUPPLY.
+ * Schedules use (start, duration):
+ *   pure linear:        start = TGE,         duration = period
+ *   cliff + linear:     start = TGE + cliff, duration = period
+ *   pure cliff (full):  start = TGE + cliff, duration = 0
  *
  * Distribution & release schedule (tentative - replace addresses/percentages with finals):
- *   Genesis Airdrop    ~44%  24mo linear                 (existing community succession)
- *   Foundation Reserve ~21%  24mo linear
- *   Team               ~10%  12mo cliff + 24mo linear
- *   Rewards Pool       ~15%  6mo cliff (full unlock)
- *   Investors          ~5%   6mo cliff + 18mo linear
- *   Exchange Airdrop   ~5%   unlocked only if required for listing (no vesting)
+ *   Genesis Airdrop    44%  24mo linear                (existing community succession)
+ *   Foundation Reserve 21%  24mo linear
+ *   Team               10%  12mo cliff + 24mo linear
+ *   Rewards Pool       15%  6mo cliff (full unlock)
+ *   Investors          5%   6mo cliff + 18mo linear
+ *   Exchange Airdrop   5%   free (released only if required for listing)
  */
 
 const E18 = 10n ** 18n;
@@ -41,56 +38,62 @@ async function main() {
   const INVESTORS_COLD = "0x0000000000000000000000000000000000000005";
   const EXCHANGE_COLD = "0x0000000000000000000000000000000000000006";
 
-  const now = Math.floor(Date.now() / 1000);
-  const TGE = now + 1 * DAY; // TGE = deploy + 1 day (must be >= block.timestamp at deploy)
+  const TGE = Math.floor(Date.now() / 1000) + 1 * DAY; // TGE = deploy + 1 day
 
-  const Vest = await ethers.getContractFactory("VestingWallet");
-
-  // 1) Vesting wallets (start, duration) per the schedule above.
-  const genesisVest = await Vest.deploy(GENESIS_AIRDROP_COLD, TGE, 24 * MONTH);
-  await genesisVest.waitForDeployment();
-  const foundationVest = await Vest.deploy(FOUNDATION_COLD, TGE, 24 * MONTH);
-  await foundationVest.waitForDeployment();
-  const teamVest = await Vest.deploy(TEAM_COLD, TGE + 12 * MONTH, 24 * MONTH);
-  await teamVest.waitForDeployment();
-  const rewardsVest = await Vest.deploy(REWARDS_COLD, TGE + 6 * MONTH, 0); // full unlock at cliff
-  await rewardsVest.waitForDeployment();
-  const investorsVest = await Vest.deploy(INVESTORS_COLD, TGE + 6 * MONTH, 18 * MONTH);
-  await investorsVest.waitForDeployment();
-
-  // 2) Allocations (percentages of 10,000,000,000).
-  const recipients = [
-    await genesisVest.getAddress(),
-    await foundationVest.getAddress(),
-    await teamVest.getAddress(),
-    await rewardsVest.getAddress(),
-    await investorsVest.getAddress(),
-    EXCHANGE_COLD, // no vesting; released manually only if needed for listing
+  // Locked tranches: (beneficiary, amount, start, duration)
+  const lockBeneficiaries = [
+    GENESIS_AIRDROP_COLD,
+    FOUNDATION_COLD,
+    TEAM_COLD,
+    REWARDS_COLD,
+    INVESTORS_COLD,
   ];
-  const amounts = [
-    4_400_000_000n * E18, // 44% Genesis Airdrop
-    2_100_000_000n * E18, // 21% Foundation Reserve
-    1_000_000_000n * E18, // 10% Team
-    1_500_000_000n * E18, // 15% Rewards Pool
-    500_000_000n * E18, //  5% Investors
-    500_000_000n * E18, //  5% Exchange Airdrop
+  const lockAmounts = [
+    4_400_000_000n * E18, // 44%
+    2_100_000_000n * E18, // 21%
+    1_000_000_000n * E18, // 10%
+    1_500_000_000n * E18, // 15%
+    500_000_000n * E18, //  5%
+  ];
+  const lockStarts = [
+    TGE, //              Genesis: linear from TGE
+    TGE, //              Foundation: linear from TGE
+    TGE + 12 * MONTH, // Team: 12mo cliff
+    TGE + 6 * MONTH, //  Rewards: 6mo cliff
+    TGE + 6 * MONTH, //  Investors: 6mo cliff
+  ];
+  const lockDurations = [
+    24 * MONTH, // Genesis
+    24 * MONTH, // Foundation
+    24 * MONTH, // Team (after cliff)
+    0, //          Rewards (full unlock at cliff)
+    18 * MONTH, // Investors (after cliff)
   ];
 
-  const sum = amounts.reduce((a, b) => a + b, 0n);
-  if (sum !== TOTAL) {
-    throw new Error(`allocation sum ${sum} != TOTAL_SUPPLY ${TOTAL}`);
-  }
+  // Free tranches: (recipient, amount)
+  const freeRecipients = [EXCHANGE_COLD];
+  const freeAmounts = [500_000_000n * E18]; // 5%
+
+  const sum =
+    [...lockAmounts, ...freeAmounts].reduce((a, b) => a + b, 0n);
+  if (sum !== TOTAL) throw new Error(`allocation sum ${sum} != TOTAL_SUPPLY ${TOTAL}`);
 
   const Token = await ethers.getContractFactory("ApmFashion");
-  const token = await Token.deploy(recipients, amounts);
+  const token = await Token.deploy(
+    lockBeneficiaries,
+    lockAmounts,
+    lockStarts,
+    lockDurations,
+    freeRecipients,
+    freeAmounts
+  );
   await token.waitForDeployment();
 
-  console.log(`ApmFashion:        ${await token.getAddress()}`);
-  console.log(`Genesis vesting:   ${await genesisVest.getAddress()}`);
-  console.log(`Foundation vesting:${await foundationVest.getAddress()}`);
-  console.log(`Team vesting:      ${await teamVest.getAddress()}`);
-  console.log(`Rewards vesting:   ${await rewardsVest.getAddress()}`);
-  console.log(`Investors vesting: ${await investorsVest.getAddress()}`);
+  console.log(`ApmFashion: ${await token.getAddress()}`);
+  const events = await token.queryFilter(token.filters.VestingDeployed());
+  for (const e of events) {
+    console.log(`  vesting ${e.args.wallet} <- beneficiary ${e.args.beneficiary} (${e.args.amount})`);
+  }
 }
 
 main().catch((e) => {
