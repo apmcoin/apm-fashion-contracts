@@ -5779,70 +5779,43 @@ pragma solidity 0.8.27;
 
 
 /// @title apM Fashion
-/// @notice Fixed-supply, ownerless, immutable BEP-20 token. A standard ERC20 with no transfer
-///         restrictions. The constructor mints the entire supply once, in a single transaction:
-///         locked tranches are minted into freshly deployed OpenZeppelin VestingWallet instances;
-///         free tranches are minted directly to the given addresses. No owner, no minting after
-///         deployment, no pause, no blacklist, no metadata setter.
-/// @dev    All vesting math lives in OpenZeppelin's imported VestingWallet. This contract adds no
+/// @notice Fixed-supply, ownerless, immutable BEP-20 token (standard ERC20, no transfer
+///         restrictions). The constructor mints the entire supply once: every allocation pool is
+///         minted into a freshly deployed OpenZeppelin VestingWallet. A pool that should be liquid
+///         at TGE simply uses duration 0 (fully releasable at its start). No owner, no minting
+///         after deployment, no pause, no blacklist.
+/// @dev    All vesting math lives in OpenZeppelin's imported VestingWallet; this contract adds no
 ///         custom vesting logic - only argument forwarding and the supply invariant.
 contract ApmFashion is ERC20, ERC20Permit {
     /// @notice Total supply: 10,000,000,000 APM (18 decimals).
     uint256 public constant TOTAL_SUPPLY = 10_000_000_000 * 1e18;
 
-    /// @notice Emitted for each vesting wallet deployed by the constructor.
+    /// @notice Emitted for each pool's vesting wallet deployed by the constructor.
     event VestingDeployed(
-        address indexed beneficiary,
-        address indexed wallet,
-        uint256 amount,
-        uint64 start,
-        uint64 duration
+        address indexed beneficiary, address indexed wallet, uint256 amount, uint64 start, uint64 duration
     );
 
-    /// @param lockBeneficiaries Beneficiaries (cold wallets) of locked tranches.
-    /// @param lockAmounts       Token amount per locked tranche.
-    /// @param lockStarts        Vesting start timestamp per tranche (cliff = start offset from TGE).
-    /// @param lockDurations     Linear duration per tranche (0 => full unlock at start).
-    /// @param freeRecipients    Recipients of immediately-liquid tranches (e.g. exchange).
-    /// @param freeAmounts       Token amount per free tranche.
+    /// @param beneficiaries Pool wallets (one per allocation pool; the pool redistributes onward).
+    /// @param amounts       Token amount per pool.
+    /// @param starts        Vesting start per pool (TGE, or TGE + cliff).
+    /// @param durations     Linear duration per pool (0 => fully releasable at start).
     constructor(
-        address[] memory lockBeneficiaries,
-        uint256[] memory lockAmounts,
-        uint64[] memory lockStarts,
-        uint64[] memory lockDurations,
-        address[] memory freeRecipients,
-        uint256[] memory freeAmounts
+        address[] memory beneficiaries,
+        uint256[] memory amounts,
+        uint64[] memory starts,
+        uint64[] memory durations
     ) ERC20("apM Fashion", "APM") ERC20Permit("apM Fashion") {
-        uint256 n = lockBeneficiaries.length;
-        require(
-            n == lockAmounts.length && n == lockStarts.length && n == lockDurations.length,
-            "lock arrays length mismatch"
-        );
-        require(freeRecipients.length == freeAmounts.length, "free arrays length mismatch");
+        uint256 n = beneficiaries.length;
+        require(n == amounts.length && n == starts.length && n == durations.length, "array length mismatch");
 
         uint256 minted;
-
         for (uint256 i = 0; i < n; ++i) {
-            require(lockAmounts[i] != 0, "zero lock amount");
-            require(lockStarts[i] >= block.timestamp, "start in past");
-
             // VestingWallet is OpenZeppelin's audited contract (imported, not custom code).
             // beneficiary == address(0) is rejected by OZ Ownable inside VestingWallet.
-            VestingWallet wallet =
-                new VestingWallet(lockBeneficiaries[i], lockStarts[i], lockDurations[i]);
-
-            _mint(address(wallet), lockAmounts[i]);
-            minted += lockAmounts[i];
-
-            emit VestingDeployed(
-                lockBeneficiaries[i], address(wallet), lockAmounts[i], lockStarts[i], lockDurations[i]
-            );
-        }
-
-        for (uint256 i = 0; i < freeRecipients.length; ++i) {
-            require(freeAmounts[i] != 0, "zero free amount");
-            _mint(freeRecipients[i], freeAmounts[i]); // zero address rejected by OZ _mint
-            minted += freeAmounts[i];
+            VestingWallet wallet = new VestingWallet(beneficiaries[i], starts[i], durations[i]);
+            _mint(address(wallet), amounts[i]);
+            minted += amounts[i];
+            emit VestingDeployed(beneficiaries[i], address(wallet), amounts[i], starts[i], durations[i]);
         }
 
         require(minted == TOTAL_SUPPLY, "supply != TOTAL_SUPPLY");

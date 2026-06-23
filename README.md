@@ -9,19 +9,18 @@ Smart contracts for apM Fashion. More contracts will be added over time.
   in the constructor. No owner, no minting after deployment, no pause, no blacklist. `name` and
   `symbol` are immutable. A standard ERC20 — no transfer restrictions.
 
-  The constructor mints the whole supply in one transaction:
-  - **locked tranches** are minted into freshly deployed OpenZeppelin `VestingWallet` instances
-    (imported and created with `new`), one per beneficiary, with per-tranche `(start, duration)`.
-  - **free tranches** are minted directly to the given addresses (e.g. exchange).
+  The constructor mints the whole supply in one transaction: **every allocation pool** is minted
+  into a freshly deployed OpenZeppelin `VestingWallet` (imported and created with `new`), one per
+  pool, with per-pool `(start, duration)`. A pool that must be liquid at TGE simply uses
+  `duration = 0`. The token adds **no custom vesting logic** — only argument forwarding and the
+  `sum == TOTAL_SUPPLY` invariant.
 
-  All vesting math lives in OpenZeppelin `VestingWallet` (imported). The token adds **no custom
-  vesting logic** — only argument forwarding and the `sum == TOTAL_SUPPLY` invariant.
-
-Schedule per tranche via `(start, duration)`:
+Schedule per pool via `(start, duration)`:
 
 - pure linear: `start = TGE`, `duration = period`
 - cliff + linear: `start = TGE + cliff`, `duration = period`
 - pure cliff (full unlock): `start = TGE + cliff`, `duration = 0`
+- liquid at TGE: `start = TGE`, `duration = 0`
 
 ## Stack
 

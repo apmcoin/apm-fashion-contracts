@@ -5,34 +5,41 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 const E18 = 10n ** 18n;
 const TOTAL = 10_000_000_000n * E18;
 const DAY = 24 * 60 * 60;
-const MONTH = 30 * DAY;
+const MONTH = 30 * DAY; // test-only convenience; real deploy uses calendar dates
 
-// A valid genesis configuration whose amounts sum to TOTAL_SUPPLY.
-//   lock[0] pure linear        4B  start=TGE,        dur=24mo
-//   lock[1] cliff + linear     3B  start=TGE+12mo,   dur=24mo
-//   lock[2] pure cliff (full)  2B  start=TGE+6mo,    dur=0
-//   free[0] exchange           1B
+// The tentative distribution table, every pool expressed as a VestingWallet:
+//   Genesis Airdrop    44%  start=TGE,        dur=24mo
+//   Foundation         21%  start=TGE,        dur=24mo
+//   Team               10%  start=TGE+12mo,   dur=24mo
+//   Rewards            15%  start=TGE+6mo,    dur=0   (full unlock at cliff)
+//   Investors           5%  start=TGE+6mo,    dur=18mo
+//   Exchange Airdrop     5%  start=TGE,        dur=0   (liquid at TGE)
 async function deployGenesis() {
-  const signers = await ethers.getSigners();
-  const [, benLinear, benCliff, benPure, exchange] = signers;
+  const s = await ethers.getSigners();
+  const [, genesis, foundation, team, rewards, investors, exchange] = s;
   const tge = (await time.latest()) + DAY;
 
-  const lockBeneficiaries = [benLinear.address, benCliff.address, benPure.address];
-  const lockAmounts = [4_000_000_000n * E18, 3_000_000_000n * E18, 2_000_000_000n * E18];
-  const lockStarts = [tge, tge + 12 * MONTH, tge + 6 * MONTH];
-  const lockDurations = [24 * MONTH, 24 * MONTH, 0];
-  const freeRecipients = [exchange.address];
-  const freeAmounts = [1_000_000_000n * E18];
+  const beneficiaries = [
+    genesis.address,
+    foundation.address,
+    team.address,
+    rewards.address,
+    investors.address,
+    exchange.address,
+  ];
+  const amounts = [
+    4_400_000_000n * E18,
+    2_100_000_000n * E18,
+    1_000_000_000n * E18,
+    1_500_000_000n * E18,
+    500_000_000n * E18,
+    500_000_000n * E18,
+  ];
+  const starts = [tge, tge, tge + 12 * MONTH, tge + 6 * MONTH, tge + 6 * MONTH, tge];
+  const durations = [24 * MONTH, 24 * MONTH, 24 * MONTH, 0, 18 * MONTH, 0];
 
   const Token = await ethers.getContractFactory("ApmFashion");
-  const token = await Token.deploy(
-    lockBeneficiaries,
-    lockAmounts,
-    lockStarts,
-    lockDurations,
-    freeRecipients,
-    freeAmounts
-  );
+  const token = await Token.deploy(beneficiaries, amounts, starts, durations);
   await token.waitForDeployment();
 
   const events = await token.queryFilter(token.filters.VestingDeployed());
@@ -44,7 +51,7 @@ async function deployGenesis() {
     duration: Number(e.args.duration),
   }));
 
-  return { token, tge, wallets, exchange, lockAmounts };
+  return { token, tge, wallets, signers: { genesis, exchange } };
 }
 
 describe("ApmFashion", () => {
@@ -57,25 +64,15 @@ describe("ApmFashion", () => {
     expect(await token.decimals()).to.equal(18);
   });
 
-  it("deploys one vesting wallet per locked tranche, each holding its amount", async () => {
-    const { token, wallets, lockAmounts } = await deployGenesis();
-    expect(wallets.length).to.equal(3);
-    for (let i = 0; i < wallets.length; i++) {
-      expect(wallets[i].amount).to.equal(lockAmounts[i]);
-      expect(await token.balanceOf(wallets[i].wallet)).to.equal(lockAmounts[i]);
+  it("deploys one vesting wallet per pool, each holding its amount", async () => {
+    const { token, wallets } = await deployGenesis();
+    expect(wallets.length).to.equal(6);
+    let sum = 0n;
+    for (const w of wallets) {
+      expect(await token.balanceOf(w.wallet)).to.equal(w.amount);
+      sum += w.amount;
     }
-  });
-
-  it("mints free tranches directly to recipients", async () => {
-    const { token, exchange } = await deployGenesis();
-    expect(await token.balanceOf(exchange.address)).to.equal(1_000_000_000n * E18);
-  });
-
-  it("is a standard ERC20 with no transfer restrictions (free tokens move freely)", async () => {
-    const { token, exchange } = await deployGenesis();
-    const [, , , , , other] = await ethers.getSigners();
-    await token.connect(exchange).transfer(other.address, 1000n * E18);
-    expect(await token.balanceOf(other.address)).to.equal(1000n * E18);
+    expect(sum).to.equal(TOTAL);
   });
 
   it("has no owner / mint entrypoints (ownerless)", async () => {
@@ -86,68 +83,42 @@ describe("ApmFashion", () => {
 });
 
 describe("ApmFashion - constructor guards", () => {
-  async function deployBad(overrides: Partial<{
-    lockBeneficiaries: string[];
-    lockAmounts: bigint[];
-    lockStarts: number[];
-    lockDurations: number[];
-    freeRecipients: string[];
-    freeAmounts: bigint[];
-  }>) {
-    const [, ben, exchange] = await ethers.getSigners();
+  async function deployBad(
+    overrides: Partial<{
+      beneficiaries: string[];
+      amounts: bigint[];
+      starts: number[];
+      durations: number[];
+    }>
+  ) {
+    const [, a] = await ethers.getSigners();
     const tge = (await time.latest()) + DAY;
     const base = {
-      lockBeneficiaries: [ben.address],
-      lockAmounts: [9_000_000_000n * E18],
-      lockStarts: [tge],
-      lockDurations: [24 * MONTH],
-      freeRecipients: [exchange.address],
-      freeAmounts: [1_000_000_000n * E18],
+      beneficiaries: [a.address],
+      amounts: [TOTAL],
+      starts: [tge],
+      durations: [24 * MONTH],
     };
     const cfg = { ...base, ...overrides };
     const Token = await ethers.getContractFactory("ApmFashion");
-    return Token.deploy(
-      cfg.lockBeneficiaries,
-      cfg.lockAmounts,
-      cfg.lockStarts,
-      cfg.lockDurations,
-      cfg.freeRecipients,
-      cfg.freeAmounts
-    );
+    return Token.deploy(cfg.beneficiaries, cfg.amounts, cfg.starts, cfg.durations);
   }
 
   it("reverts when total != TOTAL_SUPPLY", async () => {
-    await expect(deployBad({ freeAmounts: [1n * E18] })).to.be.revertedWith(
-      "supply != TOTAL_SUPPLY"
+    await expect(deployBad({ amounts: [TOTAL - 1n] })).to.be.revertedWith("supply != TOTAL_SUPPLY");
+  });
+
+  it("reverts on array length mismatch", async () => {
+    await expect(deployBad({ durations: [24 * MONTH, 12 * MONTH] })).to.be.revertedWith(
+      "array length mismatch"
     );
-  });
-
-  it("reverts on lock array length mismatch", async () => {
-    await expect(deployBad({ lockDurations: [24 * MONTH, 12 * MONTH] })).to.be.revertedWith(
-      "lock arrays length mismatch"
-    );
-  });
-
-  it("reverts on free array length mismatch", async () => {
-    await expect(deployBad({ freeAmounts: [1_000_000_000n * E18, 1n] })).to.be.revertedWith(
-      "free arrays length mismatch"
-    );
-  });
-
-  it("reverts on zero lock amount", async () => {
-    await expect(deployBad({ lockAmounts: [0n] })).to.be.revertedWith("zero lock amount");
-  });
-
-  it("reverts on lock start in the past", async () => {
-    const now = await time.latest();
-    await expect(deployBad({ lockStarts: [now - 10] })).to.be.revertedWith("start in past");
   });
 });
 
 describe("ApmFashion - vesting behaviour (OZ VestingWallet)", () => {
-  it("pure linear wallet: 0 before start, half at mid, full at end", async () => {
+  it("linear pool (Genesis): 0 before start, half at mid, full at end", async () => {
     const { token, tge, wallets } = await deployGenesis();
-    const w = wallets[0]; // linear, start=tge, dur=24mo, amount=4B
+    const w = wallets[0]; // Genesis: start=tge, dur=24mo, 4.4B
     const vest = await ethers.getContractAt("VestingWallet", w.wallet);
     const tokenAddr = await token.getAddress();
     const releasable = (a: string) => vest["releasable(address)"](a);
@@ -162,9 +133,9 @@ describe("ApmFashion - vesting behaviour (OZ VestingWallet)", () => {
     expect(await releasable(tokenAddr)).to.equal(w.amount);
   });
 
-  it("pure cliff wallet (dur=0): 0 before start, full at start", async () => {
+  it("liquid pool (Exchange, dur=0): 0 before TGE, full at TGE", async () => {
     const { token, wallets } = await deployGenesis();
-    const w = wallets[2]; // pure cliff, start=tge+6mo, dur=0, amount=2B
+    const w = wallets[5]; // Exchange: start=tge, dur=0, 0.5B
     const vest = await ethers.getContractAt("VestingWallet", w.wallet);
     const tokenAddr = await token.getAddress();
     const releasable = (a: string) => vest["releasable(address)"](a);
@@ -176,35 +147,43 @@ describe("ApmFashion - vesting behaviour (OZ VestingWallet)", () => {
     expect(await releasable(tokenAddr)).to.equal(w.amount);
   });
 
-  it("release(token) transfers vested tokens to the beneficiary", async () => {
-    const { token, wallets } = await deployGenesis();
-    const w = wallets[0];
+  it("release(token) makes a liquid pool's tokens transferable", async () => {
+    const { token, wallets, signers } = await deployGenesis();
+    const w = wallets[5]; // Exchange pool
     const vest = await ethers.getContractAt("VestingWallet", w.wallet);
     const tokenAddr = await token.getAddress();
+    const [, , , , , , , other] = await ethers.getSigners();
 
-    await time.increaseTo(w.start + w.duration); // fully vested
-    await expect(vest["release(address)"](tokenAddr))
-      .to.emit(vest, "ERC20Released")
-      .withArgs(tokenAddr, w.amount);
+    await time.increaseTo(w.start); // fully releasable
+    await vest["release(address)"](tokenAddr);
+    expect(await token.balanceOf(signers.exchange.address)).to.equal(w.amount);
 
-    expect(await token.balanceOf(w.beneficiary)).to.equal(w.amount);
-    expect(await token.balanceOf(w.wallet)).to.equal(0n);
+    // now a standard ERC20 transfer works (no restriction on the token)
+    await token.connect(signers.exchange).transfer(other.address, 1000n * E18);
+    expect(await token.balanceOf(other.address)).to.equal(1000n * E18);
   });
 });
 
 describe("ApmFashion - ERC20Permit (EIP-2612)", () => {
   it("sets allowance via a valid permit signature and bumps the nonce", async () => {
-    const { token, exchange } = await deployGenesis();
-    const [, , , , , spender] = await ethers.getSigners();
+    const { token, wallets, signers } = await deployGenesis();
+    const w = wallets[5];
+    const vest = await ethers.getContractAt("VestingWallet", w.wallet);
+    const tokenAddr = await token.getAddress();
+    const [, , , , , , , spender] = await ethers.getSigners();
+
+    await time.increaseTo(w.start);
+    await vest["release(address)"](tokenAddr); // give exchange some liquid balance
+    const owner = signers.exchange;
 
     const value = 1_000n * E18;
     const deadline = (await time.latest()) + 3600;
-    const nonce = await token.nonces(exchange.address);
+    const nonce = await token.nonces(owner.address);
     const domain = {
       name: "apM Fashion",
       version: "1",
       chainId: (await ethers.provider.getNetwork()).chainId,
-      verifyingContract: await token.getAddress(),
+      verifyingContract: tokenAddr,
     };
     const types = {
       Permit: [
@@ -215,18 +194,12 @@ describe("ApmFashion - ERC20Permit (EIP-2612)", () => {
         { name: "deadline", type: "uint256" },
       ],
     };
-    const message = {
-      owner: exchange.address,
-      spender: spender.address,
-      value,
-      nonce,
-      deadline,
-    };
-    const sig = await exchange.signTypedData(domain, types, message);
+    const message = { owner: owner.address, spender: spender.address, value, nonce, deadline };
+    const sig = await owner.signTypedData(domain, types, message);
     const { v, r, s } = ethers.Signature.from(sig);
 
-    await token.permit(exchange.address, spender.address, value, deadline, v, r, s);
-    expect(await token.allowance(exchange.address, spender.address)).to.equal(value);
-    expect(await token.nonces(exchange.address)).to.equal(nonce + 1n);
+    await token.permit(owner.address, spender.address, value, deadline, v, r, s);
+    expect(await token.allowance(owner.address, spender.address)).to.equal(value);
+    expect(await token.nonces(owner.address)).to.equal(nonce + 1n);
   });
 });
