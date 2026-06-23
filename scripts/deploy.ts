@@ -3,15 +3,10 @@ import { ethers, network } from "hardhat";
 /**
  * apM Fashion deployment - a single transaction.
  *
- * Every allocation pool is minted into its own OpenZeppelin VestingWallet, deployed by the
- * token constructor. There is no separate "free" bucket: a pool that must be liquid at TGE
- * simply uses duration 0 (fully releasable at its start).
- *
- * Schedules use (start, duration):
- *   pure linear:       start = TGE,         duration = period
- *   cliff + linear:    start = TGE + cliff, duration = period
- *   pure cliff (full): start = TGE + cliff, duration = 0
- *   liquid at TGE:     start = TGE,         duration = 0
+ * Every allocation pool is minted into its own OpenZeppelin VestingWallet, deployed by the token
+ * constructor. Schedules are written in human terms (cliff months + linear months) and converted
+ * to exact calendar timestamps here - no 30-day approximation (handles 28-31 day months & leap
+ * years). A pool that must be liquid at TGE uses 0 cliff + 0 linear (duration 0 at TGE).
  *
  * Distribution & release schedule (tentative - replace addresses/percentages with finals):
  *   Genesis Airdrop    44%  24mo linear                (existing community succession)
@@ -25,7 +20,17 @@ import { ethers, network } from "hardhat";
 const E18 = 10n ** 18n;
 const TOTAL = 10_000_000_000n * E18;
 const DAY = 24 * 60 * 60;
-const MONTH = 30 * DAY; // NOTE: 30-day approximation; switch to calendar dates for the real TGE
+
+/** Add calendar months to a UNIX timestamp (UTC; clamps end-of-month, handles leap years). */
+function addMonths(unixSeconds: number, months: number): number {
+  const d = new Date(unixSeconds * 1000);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return Math.floor(d.getTime() / 1000);
+}
+
+function fmt(unixSeconds: number): string {
+  return new Date(unixSeconds * 1000).toISOString();
+}
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -33,40 +38,39 @@ async function main() {
   console.log(`Deployer: ${deployer.address}`);
 
   // ----- TODO: replace with real pool cold-wallet addresses -----
-  const GENESIS_AIRDROP = "0x0000000000000000000000000000000000000001";
-  const FOUNDATION = "0x0000000000000000000000000000000000000002";
-  const TEAM = "0x0000000000000000000000000000000000000003";
-  const REWARDS = "0x0000000000000000000000000000000000000004";
-  const INVESTORS = "0x0000000000000000000000000000000000000005";
-  const EXCHANGE = "0x0000000000000000000000000000000000000006";
+  const POOLS = [
+    { name: "Genesis Airdrop", addr: "0x0000000000000000000000000000000000000001", pct: 4_400_000_000n, cliffMonths: 0, linearMonths: 24 },
+    { name: "Foundation",      addr: "0x0000000000000000000000000000000000000002", pct: 2_100_000_000n, cliffMonths: 0, linearMonths: 24 },
+    { name: "Team",            addr: "0x0000000000000000000000000000000000000003", pct: 1_000_000_000n, cliffMonths: 12, linearMonths: 24 },
+    { name: "Rewards",         addr: "0x0000000000000000000000000000000000000004", pct: 1_500_000_000n, cliffMonths: 6, linearMonths: 0 },
+    { name: "Investors",       addr: "0x0000000000000000000000000000000000000005", pct: 500_000_000n, cliffMonths: 6, linearMonths: 18 },
+    { name: "Exchange Airdrop", addr: "0x0000000000000000000000000000000000000006", pct: 500_000_000n, cliffMonths: 0, linearMonths: 0 },
+  ];
 
-  const TGE = Math.floor(Date.now() / 1000) + 1 * DAY; // TGE = deploy + 1 day
+  // TGE: set TGE_ISO (e.g. "2026-07-01T00:00:00Z") for the real launch; else deploy + 1 day.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const TGE = process.env.TGE_ISO ? Math.floor(Date.parse(process.env.TGE_ISO) / 1000) : nowSec + DAY;
+  if (!Number.isFinite(TGE)) throw new Error(`invalid TGE_ISO: ${process.env.TGE_ISO}`);
+  if (TGE < nowSec) throw new Error(`TGE ${fmt(TGE)} is in the past`);
+  console.log(`TGE: ${fmt(TGE)}`);
 
-  const beneficiaries = [GENESIS_AIRDROP, FOUNDATION, TEAM, REWARDS, INVESTORS, EXCHANGE];
-  const amounts = [
-    4_400_000_000n * E18, // 44%
-    2_100_000_000n * E18, // 21%
-    1_000_000_000n * E18, // 10%
-    1_500_000_000n * E18, // 15%
-    500_000_000n * E18, //  5%
-    500_000_000n * E18, //  5%
-  ];
-  const starts = [
-    TGE, //              Genesis
-    TGE, //              Foundation
-    TGE + 12 * MONTH, // Team (12mo cliff)
-    TGE + 6 * MONTH, //  Rewards (6mo cliff)
-    TGE + 6 * MONTH, //  Investors (6mo cliff)
-    TGE, //              Exchange (liquid at TGE)
-  ];
-  const durations = [
-    24 * MONTH, // Genesis
-    24 * MONTH, // Foundation
-    24 * MONTH, // Team
-    0, //          Rewards (full unlock at cliff)
-    18 * MONTH, // Investors
-    0, //          Exchange (full unlock at TGE)
-  ];
+  const beneficiaries: string[] = [];
+  const amounts: bigint[] = [];
+  const starts: number[] = [];
+  const durations: number[] = [];
+
+  for (const p of POOLS) {
+    const start = addMonths(TGE, p.cliffMonths); // cliff = start offset from TGE
+    const end = addMonths(start, p.linearMonths); // linear runs for N calendar months after cliff
+    const duration = end - start; // exact seconds (0 when linearMonths == 0)
+    beneficiaries.push(p.addr);
+    amounts.push(p.pct * E18);
+    starts.push(start);
+    durations.push(duration);
+    console.log(
+      `  ${p.name.padEnd(16)} ${p.pct} APM  start=${fmt(start)}  end=${fmt(end)}  dur=${duration}s`
+    );
+  }
 
   const sum = amounts.reduce((a, b) => a + b, 0n);
   if (sum !== TOTAL) throw new Error(`allocation sum ${sum} != TOTAL_SUPPLY ${TOTAL}`);
@@ -75,7 +79,7 @@ async function main() {
   const token = await Token.deploy(beneficiaries, amounts, starts, durations);
   await token.waitForDeployment();
 
-  console.log(`ApmFashion: ${await token.getAddress()}`);
+  console.log(`\nApmFashion: ${await token.getAddress()}`);
   const events = await token.queryFilter(token.filters.VestingDeployed());
   for (const e of events) {
     console.log(`  pool ${e.args.beneficiary} -> vesting ${e.args.wallet} (${e.args.amount})`);
