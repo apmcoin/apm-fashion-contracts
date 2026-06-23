@@ -1,7 +1,7 @@
 {
-  "name": "apm-fashion-token",
+  "name": "apm-fashion-contracts",
   "version": "1.0.0",
-  "description": "apM Fashion (APM) - fixed-supply, ownerless BEP-20 token with cliff-vesting wallets.",
+  "description": "apM Fashion smart contracts. Includes the ownerless fixed-supply token and cliff-vesting wallets; more contracts to be added.",
   "license": "MIT",
   "scripts": {
     "compile": "hardhat compile",
