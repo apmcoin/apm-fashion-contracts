@@ -8,9 +8,18 @@ more contracts will be added over time.
 - **ApmFashion** — `ERC20` + `ERC20Permit`. Fixed supply of 10,000,000,000 APM (18 decimals),
   minted once in the constructor to the addresses passed as arguments. No owner, no minting
   after deployment, no pause, no blacklist. `name` and `symbol` are immutable.
-- **CliffVestingWallet** — OpenZeppelin `VestingWallet` with a cliff. Each instance takes its
-  own `start`, `duration`, and `cliff` at deployment. `owner` is the beneficiary; the schedule
-  is immutable and `release()` is permissionless.
+  This is the only custom contract (the sole audit target).
+
+Vesting uses OpenZeppelin's stock **`VestingWallet`** directly — no custom vesting code.
+Schedules are expressed purely via `(start, duration)`:
+
+- pure linear: `start = TGE`, `duration = linear period`
+- cliff + linear: `start = TGE + cliff`, `duration = linear period`
+- pure cliff (full unlock): `start = TGE + cliff`, `duration = 0`
+
+`contracts/Imports.sol` is a one-line shim that pulls `VestingWallet` into the build so Hardhat
+produces its artifact for deployment. (For a cliff *inside* the total period, OZ's
+`VestingWalletCliff` covers it — still no custom code.)
 
 ## Stack
 
