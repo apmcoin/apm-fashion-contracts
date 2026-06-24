@@ -4760,12 +4760,10 @@ abstract contract ERC20Permit is ERC20, IERC20Permit, EIP712, Nonces {
 pragma solidity 0.8.27;
 
 
-/// @notice Fixed-supply, ownerless BEP-20 token. The full supply is minted once in the
-///         constructor to the given recipients.
 contract ApmFashion is ERC20, ERC20Permit {
     uint256 public constant TOTAL_SUPPLY = 10_000_000_000 * 1e18;
 
-    /// @param recipients Address per allocation (vesting wallet or treasury).
+    /// @param recipients Vesting contract addresses (one per pool).
     /// @param amounts    Amount per recipient; must sum to TOTAL_SUPPLY.
     constructor(address[] memory recipients, uint256[] memory amounts)
         ERC20("apM Fashion", "APM")
@@ -4776,6 +4774,7 @@ contract ApmFashion is ERC20, ERC20Permit {
         uint256 minted;
         for (uint256 i = 0; i < recipients.length; ++i) {
             require(recipients[i] != address(0), "zero recipient");
+            require(amounts[i] > 0, "zero amount");
             _mint(recipients[i], amounts[i]);
             minted += amounts[i];
         }

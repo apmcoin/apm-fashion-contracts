@@ -38,6 +38,11 @@ describe("ApmFashion", () => {
     await expect(deployToken([ethers.ZeroAddress], [TOTAL])).to.be.revertedWith("zero recipient");
   });
 
+  it("reverts on zero amount", async () => {
+    const [a, b] = await ethers.getSigners();
+    await expect(deployToken([a.address, b.address], [TOTAL, 0n])).to.be.revertedWith("zero amount");
+  });
+
   it("has no owner / mint entrypoints (ownerless)", async () => {
     const [a] = await ethers.getSigners();
     const token = await deployToken([a.address], [TOTAL]);
