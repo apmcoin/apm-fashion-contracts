@@ -113,6 +113,12 @@ describe("ApmFashion - constructor guards", () => {
       "array length mismatch"
     );
   });
+
+  it("reverts on zero beneficiary", async () => {
+    await expect(deployBad({ beneficiaries: [ethers.ZeroAddress] })).to.be.revertedWith(
+      "zero beneficiary"
+    );
+  });
 });
 
 describe("ApmFashion - vesting behaviour (OZ VestingWallet)", () => {

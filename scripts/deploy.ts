@@ -1,27 +1,35 @@
 import { ethers, network } from "hardhat";
+import * as fs from "fs";
+import * as path from "path";
 
 /**
  * apM Fashion deployment - a single transaction.
  *
- * Every allocation pool is minted into its own OpenZeppelin VestingWallet, deployed by the token
- * constructor. Schedules are written in human terms (cliff months + linear months) and converted
- * to exact calendar timestamps here - no 30-day approximation (handles 28-31 day months & leap
- * years). A pool that must be liquid at TGE uses 0 cliff + 0 linear (duration 0 at TGE).
+ * Allocations live in a CSV (default: config/allocations.example.csv; override with env
+ * ALLOCATIONS). Columns: pool,address,amount,cliffMonths,linearMonths
+ *   - amount         : whole tokens (authoritative; sum must equal 10,000,000,000)
+ *   - cliffMonths    : months before vesting starts (start = TGE + cliff)
+ *   - linearMonths   : linear release months after the cliff (0 => full unlock at start)
  *
- * Distribution & release schedule (tentative - replace addresses/percentages with finals):
- *   Genesis Airdrop    44%  24mo linear                (existing community succession)
- *   Foundation Reserve 21%  24mo linear
- *   Team               10%  12mo cliff + 24mo linear
- *   Rewards Pool       15%  6mo cliff (full unlock)
- *   Investors          5%   6mo cliff + 18mo linear
- *   Exchange Airdrop   5%   liquid at TGE (released only if required for listing)
+ * Schedules are converted to exact calendar timestamps (no 30-day approximation).
+ * A pool liquid at TGE uses cliffMonths=0, linearMonths=0.
  */
 
 const E18 = 10n ** 18n;
-const TOTAL = 10_000_000_000n * E18;
+const TOTAL_TOKENS = 10_000_000_000n;
+const TOTAL = TOTAL_TOKENS * E18;
 const DAY = 24 * 60 * 60;
 
-/** Add calendar months to a UNIX timestamp (UTC; clamps end-of-month, handles leap years). */
+interface Pool {
+  pool: string;
+  address: string;
+  amount: bigint; // whole tokens
+  cliffMonths: number;
+  linearMonths: number;
+  row: number;
+}
+
+/** Add calendar months to a UNIX timestamp (UTC; handles 28-31 day months & leap years). */
 function addMonths(unixSeconds: number, months: number): number {
   const d = new Date(unixSeconds * 1000);
   d.setUTCMonth(d.getUTCMonth() + months);
@@ -32,48 +40,85 @@ function fmt(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toISOString();
 }
 
+function loadAllocations(file: string): Pool[] {
+  const lines = fs
+    .readFileSync(file, "utf8")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith("#"));
+  if (lines.length < 2) throw new Error(`allocations file has no data rows: ${file}`);
+
+  const header = lines.shift()!.toLowerCase().replace(/\s/g, "");
+  if (header !== "pool,address,amount,cliffmonths,linearmonths") {
+    throw new Error(`unexpected CSV header: "${header}"`);
+  }
+
+  return lines.map((line, i) => {
+    const parts = line.split(",").map((s) => s.trim());
+    if (parts.length !== 5) throw new Error(`row ${i + 2}: expected 5 columns, got ${parts.length}`);
+    return {
+      pool: parts[0],
+      address: parts[1],
+      amount: BigInt(parts[2]),
+      cliffMonths: Number(parts[3]),
+      linearMonths: Number(parts[4]),
+      row: i + 2,
+    };
+  });
+}
+
+function validate(pools: Pool[]): void {
+  if (pools.length === 0) throw new Error("no pools");
+  const seen = new Set<string>();
+  let sum = 0n;
+  for (const p of pools) {
+    if (!ethers.isAddress(p.address)) throw new Error(`row ${p.row} (${p.pool}): invalid address ${p.address}`);
+    const a = ethers.getAddress(p.address); // checksum
+    if (a === ethers.ZeroAddress) throw new Error(`row ${p.row} (${p.pool}): zero address`);
+    if (seen.has(a)) throw new Error(`row ${p.row} (${p.pool}): duplicate address ${a}`);
+    seen.add(a);
+    if (p.amount <= 0n) throw new Error(`row ${p.row} (${p.pool}): amount must be > 0`);
+    if (!Number.isInteger(p.cliffMonths) || p.cliffMonths < 0) throw new Error(`row ${p.row} (${p.pool}): bad cliffMonths`);
+    if (!Number.isInteger(p.linearMonths) || p.linearMonths < 0) throw new Error(`row ${p.row} (${p.pool}): bad linearMonths`);
+    sum += p.amount;
+  }
+  if (sum !== TOTAL_TOKENS) throw new Error(`allocation sum ${sum} tokens != TOTAL_SUPPLY ${TOTAL_TOKENS}`);
+}
+
 async function main() {
   const [deployer] = await ethers.getSigners();
   console.log(`Network: ${network.name}`);
   console.log(`Deployer: ${deployer.address}`);
 
-  // ----- TODO: replace with real pool cold-wallet addresses -----
-  const POOLS = [
-    { name: "Genesis Airdrop", addr: "0x0000000000000000000000000000000000000001", pct: 4_400_000_000n, cliffMonths: 0, linearMonths: 24 },
-    { name: "Foundation",      addr: "0x0000000000000000000000000000000000000002", pct: 2_100_000_000n, cliffMonths: 0, linearMonths: 24 },
-    { name: "Team",            addr: "0x0000000000000000000000000000000000000003", pct: 1_000_000_000n, cliffMonths: 12, linearMonths: 24 },
-    { name: "Rewards",         addr: "0x0000000000000000000000000000000000000004", pct: 1_500_000_000n, cliffMonths: 6, linearMonths: 0 },
-    { name: "Investors",       addr: "0x0000000000000000000000000000000000000005", pct: 500_000_000n, cliffMonths: 6, linearMonths: 18 },
-    { name: "Exchange Airdrop", addr: "0x0000000000000000000000000000000000000006", pct: 500_000_000n, cliffMonths: 0, linearMonths: 0 },
-  ];
+  const file = process.env.ALLOCATIONS || path.join("config", "allocations.example.csv");
+  console.log(`Allocations: ${file}`);
+  const pools = loadAllocations(file);
+  validate(pools);
 
-  // TGE: set TGE_ISO (e.g. "2026-07-01T00:00:00Z") for the real launch; else deploy + 1 day.
   const nowSec = Math.floor(Date.now() / 1000);
   const TGE = process.env.TGE_ISO ? Math.floor(Date.parse(process.env.TGE_ISO) / 1000) : nowSec + DAY;
   if (!Number.isFinite(TGE)) throw new Error(`invalid TGE_ISO: ${process.env.TGE_ISO}`);
   if (TGE < nowSec) throw new Error(`TGE ${fmt(TGE)} is in the past`);
-  console.log(`TGE: ${fmt(TGE)}`);
+  console.log(`TGE: ${fmt(TGE)}\n`);
 
   const beneficiaries: string[] = [];
   const amounts: bigint[] = [];
   const starts: number[] = [];
   const durations: number[] = [];
 
-  for (const p of POOLS) {
-    const start = addMonths(TGE, p.cliffMonths); // cliff = start offset from TGE
-    const end = addMonths(start, p.linearMonths); // linear runs for N calendar months after cliff
-    const duration = end - start; // exact seconds (0 when linearMonths == 0)
-    beneficiaries.push(p.addr);
-    amounts.push(p.pct * E18);
+  for (const p of pools) {
+    const start = addMonths(TGE, p.cliffMonths);
+    const end = addMonths(start, p.linearMonths);
+    const duration = end - start;
+    beneficiaries.push(ethers.getAddress(p.address));
+    amounts.push(p.amount * E18);
     starts.push(start);
     durations.push(duration);
+    const pct = (Number(p.amount) / Number(TOTAL_TOKENS)) * 100;
     console.log(
-      `  ${p.name.padEnd(16)} ${p.pct} APM  start=${fmt(start)}  end=${fmt(end)}  dur=${duration}s`
+      `  ${p.pool.padEnd(18)} ${p.amount} (${pct.toFixed(1)}%)  start=${fmt(start)}  end=${fmt(end)}`
     );
   }
-
-  const sum = amounts.reduce((a, b) => a + b, 0n);
-  if (sum !== TOTAL) throw new Error(`allocation sum ${sum} != TOTAL_SUPPLY ${TOTAL}`);
 
   const Token = await ethers.getContractFactory("ApmFashion");
   const token = await Token.deploy(beneficiaries, amounts, starts, durations);

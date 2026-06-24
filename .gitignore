@@ -6,3 +6,6 @@ typechain-types
 coverage
 coverage.json
 *.log
+# real allocation files are gitignored; only the example template is committed
+config/allocations*.csv
+!config/allocations.example.csv

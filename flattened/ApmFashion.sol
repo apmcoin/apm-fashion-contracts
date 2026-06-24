@@ -5810,8 +5810,8 @@ contract ApmFashion is ERC20, ERC20Permit {
 
         uint256 minted;
         for (uint256 i = 0; i < n; ++i) {
-            // VestingWallet is OpenZeppelin's audited contract (imported, not custom code).
-            // beneficiary == address(0) is rejected by OZ Ownable inside VestingWallet.
+            require(beneficiaries[i] != address(0), "zero beneficiary");
+
             VestingWallet wallet = new VestingWallet(beneficiaries[i], starts[i], durations[i]);
             _mint(address(wallet), amounts[i]);
             minted += amounts[i];

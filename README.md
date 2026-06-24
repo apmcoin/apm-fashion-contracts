@@ -44,7 +44,11 @@ npm run deploy:bsc
 
 ## Notes
 
-- Allocations and vesting schedules are deployment arguments — set them in `scripts/deploy.ts`.
+- Allocations and vesting schedules live in a CSV (`config/allocations.csv`); the deploy script
+  validates it (sum == TOTAL_SUPPLY, valid/checksummed/non-duplicate addresses, integer months)
+  and converts cliff/linear months into calendar-accurate timestamps. Choose the file with the
+  `ALLOCATIONS` env var; `config/allocations.example.csv` is the committed template (real files
+  are gitignored).
 - Source comments are ASCII-only to avoid any verification encoding mismatch.
 - Token logos are registered off-chain (BscScan, token lists); ERC-20 has no logo field.
 - Confirm the on-chain `symbol` matches the exchange listing ticker before deploying (immutable).
