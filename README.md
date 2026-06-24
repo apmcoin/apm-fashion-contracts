@@ -5,8 +5,12 @@ Fixed-supply, ownerless BEP-20 token for apM Fashion.
 ## Contracts
 
 - `ApmFashion` — `ERC20` + `ERC20Permit`. Fixed supply 10,000,000,000 (18 decimals), minted once
-  in the constructor. No owner, no mint after deploy, no pause, no blacklist. Each allocation pool
-  is minted into an OpenZeppelin `VestingWallet`; pools liquid at TGE use `duration = 0`.
+  in the constructor to the given recipients. No owner, no mint after deploy, no pause, no
+  blacklist. This is the only in-scope contract.
+
+The deploy script deploys one stock OpenZeppelin `VestingWallet` per allocation pool, mints the
+supply directly into them, then verifies the on-chain state. The vesting wallets are unmodified
+OpenZeppelin (out of audit scope).
 
 ## Develop
 

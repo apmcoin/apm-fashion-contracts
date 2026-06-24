@@ -3,16 +3,16 @@ import * as fs from "fs";
 import * as path from "path";
 
 /**
- * apM Fashion deployment - a single transaction.
+ * apM Fashion deployment (Model A).
  *
- * Allocations live in a CSV (default: config/allocations.example.csv; override with env
- * ALLOCATIONS). Columns: pool,address,amount,cliffMonths,linearMonths
- *   - amount         : whole tokens (authoritative; sum must equal 10,000,000,000)
- *   - cliffMonths    : months before vesting starts (start = TGE + cliff)
- *   - linearMonths   : linear release months after the cliff (0 => full unlock at start)
+ * 1) Read + validate the allocations CSV.
+ * 2) Deploy one stock OpenZeppelin VestingWallet per pool (out of audit scope).
+ * 3) Deploy ApmFashion, minting the full supply directly into those vesting wallets.
+ * 4) Post-verify on-chain state (balances, beneficiaries, schedules, total supply).
  *
- * Schedules are converted to exact calendar timestamps (no 30-day approximation).
- * A pool liquid at TGE uses cliffMonths=0, linearMonths=0.
+ * CSV columns: pool,address,amount,cliffMonths,linearMonths
+ *   amount = whole tokens (sum must equal 10,000,000,000)
+ *   schedule: start = TGE + cliffMonths, duration = linearMonths (calendar-accurate; 0 = liquid)
  */
 
 const E18 = 10n ** 18n;
@@ -23,13 +23,12 @@ const DAY = 24 * 60 * 60;
 interface Pool {
   pool: string;
   address: string;
-  amount: bigint; // whole tokens
+  amount: bigint;
   cliffMonths: number;
   linearMonths: number;
   row: number;
 }
 
-/** Add calendar months to a UNIX timestamp (UTC; handles 28-31 day months & leap years). */
 function addMonths(unixSeconds: number, months: number): number {
   const d = new Date(unixSeconds * 1000);
   d.setUTCMonth(d.getUTCMonth() + months);
@@ -73,7 +72,7 @@ function validate(pools: Pool[]): void {
   let sum = 0n;
   for (const p of pools) {
     if (!ethers.isAddress(p.address)) throw new Error(`row ${p.row} (${p.pool}): invalid address ${p.address}`);
-    const a = ethers.getAddress(p.address); // checksum
+    const a = ethers.getAddress(p.address);
     if (a === ethers.ZeroAddress) throw new Error(`row ${p.row} (${p.pool}): zero address`);
     if (seen.has(a)) throw new Error(`row ${p.row} (${p.pool}): duplicate address ${a}`);
     seen.add(a);
@@ -101,34 +100,55 @@ async function main() {
   if (TGE < nowSec) throw new Error(`TGE ${fmt(TGE)} is in the past`);
   console.log(`TGE: ${fmt(TGE)}\n`);
 
-  const beneficiaries: string[] = [];
-  const amounts: bigint[] = [];
-  const starts: number[] = [];
-  const durations: number[] = [];
-
-  for (const p of pools) {
+  const schedule = pools.map((p) => {
     const start = addMonths(TGE, p.cliffMonths);
     const end = addMonths(start, p.linearMonths);
-    const duration = end - start;
-    beneficiaries.push(ethers.getAddress(p.address));
-    amounts.push(p.amount * E18);
-    starts.push(start);
-    durations.push(duration);
-    const pct = (Number(p.amount) / Number(TOTAL_TOKENS)) * 100;
-    console.log(
-      `  ${p.pool.padEnd(18)} ${p.amount} (${pct.toFixed(1)}%)  start=${fmt(start)}  end=${fmt(end)}`
-    );
+    return { ...p, address: ethers.getAddress(p.address), start, duration: end - start, amountWei: p.amount * E18 };
+  });
+
+  // 1) deploy a stock OZ VestingWallet per pool
+  const Vest = await ethers.getContractFactory("VestingWallet");
+  const wallets: string[] = [];
+  for (const s of schedule) {
+    const v = await Vest.deploy(s.address, s.start, s.duration);
+    await v.waitForDeployment();
+    const addr = await v.getAddress();
+    wallets.push(addr);
+    console.log(`  ${s.pool.padEnd(18)} vesting=${addr}  beneficiary=${s.address}  start=${fmt(s.start)}  dur=${s.duration}s`);
   }
 
+  // 2) deploy token, minting directly into the vesting wallets
   const Token = await ethers.getContractFactory("ApmFashion");
-  const token = await Token.deploy(beneficiaries, amounts, starts, durations);
+  const token = await Token.deploy(wallets, schedule.map((s) => s.amountWei));
   await token.waitForDeployment();
+  const tokenAddr = await token.getAddress();
+  console.log(`\nApmFashion: ${tokenAddr}`);
 
-  console.log(`\nApmFashion: ${await token.getAddress()}`);
-  const events = await token.queryFilter(token.filters.VestingDeployed());
-  for (const e of events) {
-    console.log(`  pool ${e.args.beneficiary} -> vesting ${e.args.wallet} (${e.args.amount})`);
+  // 3) post-verify
+  console.log(`\nVerifying on-chain state...`);
+  let ok = true;
+  const total = await token.totalSupply();
+  if (total !== TOTAL) {
+    ok = false;
+    console.error(`  [FAIL] totalSupply ${total} != ${TOTAL}`);
   }
+  for (let i = 0; i < schedule.length; i++) {
+    const s = schedule[i];
+    const v = await ethers.getContractAt("VestingWallet", wallets[i]);
+    const bal = await token.balanceOf(wallets[i]);
+    const owner = ethers.getAddress(await v.owner());
+    const vstart = Number(await v.start());
+    const vdur = Number(await v.duration());
+    const pass = bal === s.amountWei && owner === s.address && vstart === s.start && vdur === s.duration;
+    if (!pass) {
+      ok = false;
+      console.error(`  [FAIL] ${s.pool}: bal=${bal} owner=${owner} start=${vstart} dur=${vdur}`);
+    } else {
+      console.log(`  [ok] ${s.pool}: ${bal / E18} APM -> ${owner}`);
+    }
+  }
+  if (!ok) throw new Error("post-deploy verification FAILED");
+  console.log("\nAll checks passed.");
 }
 
 main().catch((e) => {
