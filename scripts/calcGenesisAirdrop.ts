@@ -116,9 +116,9 @@ ${weiRows}
 
 Total supply checksum: \`${d.newTotalSupplyWei}\` (= 10,000,000,000 × 10^18)
 
-## Genesis Airdrop Derivation
+## Genesis Allocation Derivation
 
-The genesis airdrop is derived from the legacy **ERC-20 apM Coin** supply
+The genesis allocation is derived from the legacy **ERC-20 apM Coin** supply
 on Ethereum mainnet (\`${d.legacyToken}\`).
 
 | Field                         | Value |
@@ -127,9 +127,9 @@ on Ethereum mainnet (\`${d.legacyToken}\`).
 | Foundation Wallets (excluded) | ${human(BigInt(d.legacyFoundationTotalWei), 18)} APM |
 | **Holder Supply**             | **${human(BigInt(d.legacyHolderSupplyWei), 18)} APM** |
 | Conversion ratio              | 1 : ${d.airdropMultiplier} |
-| **Genesis Airdrop (BEP-20)**  | **${d.allocations[0].amountTokens} APM** |
+| **Genesis Allocation (BEP-20)**  | **${d.allocations[0].amountTokens} APM** |
 
-### Foundation Wallets Excluded from Airdrop
+### Foundation Wallets Excluded from Allocation
 
 | Wallet           | Address | Balance (ERC-20 APM) |
 |------------------|---------|----------------------|
@@ -232,11 +232,11 @@ async function main() {
     throw new Error("checksum FAIL");
 
   const pools: Array<{ pool: string; wei: bigint }> = [
-    { pool: "Genesis Airdrop", wei: genesisWei    },
+    { pool: "Genesis Allocation", wei: genesisWei    },
     { pool: "Foundation",      wei: foundationWei },
     { pool: "Rewards",         wei: rewardsWei    },
     { pool: "Investors",       wei: investorsWei  },
-    { pool: "Exchange",        wei: exchangeWei   },
+    { pool: "Exchange Allocation", wei: exchangeWei   },
   ];
 
   console.log("\n[BEP-20 apM Fashion New Allocation — Total Supply 10,000,000,000]");

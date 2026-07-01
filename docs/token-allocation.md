@@ -7,28 +7,28 @@
 
 | Pool             |            Amount (APM)           |       Share |
 |------------------|----------------------------------:|------------:|
-| Genesis Airdrop  |  3,995,287,829.626640807679758965 | 39.9528782962% |
+| Genesis Allocation |  3,995,287,829.626640807679758965 | 39.9528782962% |
 | Foundation       |                     2,500,000,000 |       25.0% |
 | Rewards          |                     2,100,000,000 |       21.0% |
 | Investors        |                       500,000,000 |        5.0% |
-| Exchange         |    904,712,170.373359192320241035 | 9.0471217037% |
+| Exchange Allocation |    904,712,170.373359192320241035 | 9.0471217037% |
 | **Total**        | **10,000,000,000**                |   **100%**  |
 
 ## Allocation Detail (wei)
 
 | Pool             |                       Amount (wei) |
 |------------------|------------------------------------|
-| Genesis Airdrop  | `3995287829626640807679758965` |
+| Genesis Allocation | `3995287829626640807679758965` |
 | Foundation       | `2500000000000000000000000000` |
 | Rewards          | `2100000000000000000000000000` |
 | Investors        | `500000000000000000000000000` |
-| Exchange         | `904712170373359192320241035` |
+| Exchange Allocation | `904712170373359192320241035` |
 
 Total supply checksum: `10000000000000000000000000000` (= 10,000,000,000 × 10^18)
 
-## Genesis Airdrop Derivation
+## Genesis Allocation Derivation
 
-The genesis airdrop is derived from the legacy **ERC-20 apM Coin** supply
+The genesis allocation is derived from the legacy **ERC-20 apM Coin** supply
 on Ethereum mainnet (`0xc8c424b91d8ce0137bab4b832b7f7d154156ba6c`).
 
 | Field                         | Value |
@@ -37,9 +37,9 @@ on Ethereum mainnet (`0xc8c424b91d8ce0137bab4b832b7f7d154156ba6c`).
 | Foundation Wallets (excluded) | 1,013,442,434.074671838464048207 APM |
 | **Holder Supply**             | **799,057,565.925328161535951793 APM** |
 | Conversion ratio              | 1 : 5 |
-| **Genesis Airdrop (BEP-20)**  | **3,995,287,829.626640807679758965 APM** |
+| **Genesis Allocation (BEP-20)**  | **3,995,287,829.626640807679758965 APM** |
 
-### Foundation Wallets Excluded from Airdrop
+### Foundation Wallets Excluded from Allocation
 
 | Wallet           | Address | Balance (ERC-20 APM) |
 |------------------|---------|----------------------|
