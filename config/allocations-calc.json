@@ -1,0 +1,56 @@
+{
+  "generatedAt": "2026-07-01T11:56:15.704Z",
+  "script": "npx ts-node scripts/calcGenesisAirdrop.ts",
+  "legacyToken": "0xc8c424b91d8ce0137bab4b832b7f7d154156ba6c",
+  "legacyTotalSupplyWei": "1812500000000000000000000000",
+  "legacyFoundationWallets": {
+    "DRR Buyback1": {
+      "address": "0x069b1168B112621BAFB6F4e50E623977C2113108",
+      "balanceWei": "630000000361115920000000000"
+    },
+    "DRR Buyback2": {
+      "address": "0xE82FE16E845b4B00B860f061C91F40F12002E926",
+      "balanceWei": "13442433024500000000000000"
+    },
+    "Global&Reward": {
+      "address": "0xDA77254612E963b0ae2B585C23193175b368eB91",
+      "balanceWei": "370000000689055918464048207"
+    }
+  },
+  "legacyFoundationTotalWei": "1013442434074671838464048207",
+  "legacyHolderSupplyWei": "799057565925328161535951793",
+  "airdropMultiplier": 5,
+  "newTotalSupplyWei": "10000000000000000000000000000",
+  "allocations": [
+    {
+      "pool": "Genesis Airdrop",
+      "amountWei": "3995287829626640807679758965",
+      "amountTokens": "3,995,287,829.626640807679758965",
+      "share": "39.9528782962%"
+    },
+    {
+      "pool": "Foundation",
+      "amountWei": "2500000000000000000000000000",
+      "amountTokens": "2,500,000,000",
+      "share": "25.0%"
+    },
+    {
+      "pool": "Rewards",
+      "amountWei": "2100000000000000000000000000",
+      "amountTokens": "2,100,000,000",
+      "share": "21.0%"
+    },
+    {
+      "pool": "Investors",
+      "amountWei": "500000000000000000000000000",
+      "amountTokens": "500,000,000",
+      "share": "5.0%"
+    },
+    {
+      "pool": "Exchange",
+      "amountWei": "904712170373359192320241035",
+      "amountTokens": "904,712,170.373359192320241035",
+      "share": "9.0471217037%"
+    }
+  ]
+}
