@@ -1,33 +1,75 @@
 # apM Fashion Contracts
 
-Fixed-supply, ownerless BEP-20 token for apM Fashion.
+BEP-20 apM Fashion (`APM`) token deployment repository.
 
-## Contracts
+---
 
-- `ApmFashion` — `ERC20` + `ERC20Permit`. Fixed supply 10,000,000,000 (18 decimals), minted once
-  in the constructor to the given recipients. No owner, no mint after deploy, no pause, no
-  blacklist. This is the only in-scope contract.
+## Architecture
 
-The deploy script deploys one stock OpenZeppelin `VestingWallet` per allocation pool, mints the
-supply directly into them, then verifies the on-chain state. The vesting wallets are unmodified
-OpenZeppelin (out of audit scope).
+```
+ApmFashion (ownerless, BSC)
+  │  Full supply minted once at deploy to 5 Safe accounts
+  │
+  ├─ Safe — Genesis Allocation   (~39.95%)  0xd9C0E369981747851Badfbb540bC1bAb693A143A
+  ├─ Safe — Foundation           (25%)      0x2b6027A2aab2E865343eB5250D51Cd4fAFb73E12
+  ├─ Safe — Rewards              (21%)      0x1d551e7d19eFaF70f01266481b5010d0C39c8aF0
+  ├─ Safe — Investors            (5%)       0xB944a1ce8f7C691289aC90aa91B15804302F5d0F
+  └─ Safe — Exchange Allocation  (~9.05%)   0x8495a2fDc58933B59345F5f83e74aE7b033b3A4e
 
-## Develop
+Safe: Safe{Wallet} v1.4.1+L2 (BSC Mainnet), threshold 2/3
+```
+
+The Genesis Allocation amount is derived from legacy ERC-20 apM Coin non-foundation holder supply × 5 (1:5 conversion ratio).
+
+---
+
+## Files
+
+| File | Role |
+|---|---|
+| `contracts/ApmFashion.sol` | Token contract. ERC-20 + ERC-20Permit. Full supply minted once in the constructor to the given recipients. |
+| `contracts/Imports.sol` | Import file to include OZ contracts in Hardhat compilation scope. |
+| `scripts/deploy.ts` | Deploys the token with the 5 Safe addresses as recipients. Verifies on-chain balances post-deploy. |
+| `scripts/calcGenesisAirdrop.ts` | Queries Ethereum mainnet ERC-20 apM Coin → calculates Genesis Allocation → writes `allocations-calc.json` + `token-allocation.md`. |
+| `config/allocations-calc.json` | Per-pool wei-precise amounts. Source of truth for deploy inputs. |
+| `docs/token-allocation.md` | Human-readable view of `allocations-calc.json`. |
+| `test/token.test.ts` | ApmFashion unit tests. |
+
+---
+
+## Development
 
 ```bash
 npm install
 npm test
-npm run build      # compile + flatten -> flattened/ApmFashion.sol
+npm run build   # compile + flatten → flattened/ApmFashion.sol
 ```
+
+---
 
 ## Deploy
 
-Set `DEPLOYER_PRIVATE_KEY`, `TGE_ISO`, and `ALLOCATIONS` in `.env`, then:
+Set `.env`:
+
+```
+DEPLOYER_PRIVATE_KEY=
+BSC_RPC=
+BSC_TESTNET_RPC=
+```
+
+Allocations are read from `config/allocations.csv`: `pool,address,amount` (amount in whole tokens, sum must equal 10,000,000,000)
 
 ```bash
 npm run deploy:bscTestnet
 npm run deploy:bsc
 ```
 
-Allocations are read from a CSV (`config/allocations.example.csv` is the template):
-`pool,address,amount,cliffMonths,linearMonths`.
+---
+
+## Genesis Allocation Calculation
+
+```bash
+npx ts-node scripts/calcGenesisAirdrop.ts
+```
+
+Requires `ETH_RPC` in `.env`. Regenerates `config/allocations-calc.json` and `docs/token-allocation.md`.
