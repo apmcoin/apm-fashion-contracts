@@ -1,25 +1,22 @@
 /**
- * Genesis Airdrop Allocation Calculator
+ * Genesis Allocation Calculator
  *
- * Calculates the BEP-20 apM Fashion genesis airdrop allocation.
+ * Queries the legacy ERC-20 apM Coin on Ethereum mainnet to derive the
+ * Genesis Allocation for BEP-20 apM Fashion.
  *
- * The foundation-held wallets (DRR Buyback1, DRR Buyback2, Global&Reward)
- * are excluded from the legacy ERC-20 apM Coin total supply.
- * The remaining holder supply is multiplied by 5 to derive the genesis airdrop
- * allocation for the new BEP-20 token.
+ * Foundation-held wallets (DRR Buyback1, DRR Buyback2, Global&Reward) are
+ * excluded from the legacy total supply. The remaining holder supply is
+ * multiplied by 5 (1:5 conversion ratio) to produce the Genesis Allocation.
  *
  * Fixed allocations (whole tokens):
- *   Foundation  : 25%  = 2,500,000,000
- *   Rewards     : 21%  = 2,100,000,000
- *   Investors   :  5%  =   500,000,000
- *   Exchange    : remainder after the above four pools
+ *   Foundation        : 25%  = 2,500,000,000
+ *   Rewards           : 21%  = 2,100,000,000
+ *   Investors         :  5%  =   500,000,000
+ *   Exchange Allocation: remainder after the above four pools
  *
- *   genesisAirdrop = holderSupply × 5   (1:5 conversion ratio)
- *   exchange       = 10,000,000,000 - genesis - foundation - rewards - investors
- *
- * Output: config/allocations-calc.json
- * To generate docs/token-allocation.md from the JSON, run:
- *   npx ts-node scripts/generateAllocationMd.ts
+ * Outputs:
+ *   config/allocations-calc.json  — wei-precise amounts (deploy input)
+ *   docs/token-allocation.md      — human-readable view
  *
  * Usage:
  *   npx ts-node scripts/calcGenesisAirdrop.ts
@@ -181,12 +178,12 @@ async function main() {
   const generatedAt = new Date().toISOString();
 
   console.log("=".repeat(70));
-  console.log("  BEP-20 apM Fashion - Genesis Airdrop Allocation Calculator");
+  console.log("  BEP-20 apM Fashion - Genesis Allocation Calculator");
   console.log("=".repeat(70));
   console.log("  Foundation-held wallets are excluded from the legacy ERC-20 supply.");
-  console.log("  Holder supply x5 = BEP-20 genesis airdrop allocation.");
+  console.log("  Holder supply x5 = BEP-20 Genesis Allocation (1:5 conversion ratio).");
   console.log("  Foundation / Rewards / Investors are fixed whole-token amounts.");
-  console.log("  Exchange = remainder (total - all other pools).");
+  console.log("  Exchange Allocation = remainder (total - all other pools).");
   console.log(`  Generated : ${generatedAt}`);
   console.log(`  Script    : npx ts-node scripts/calcGenesisAirdrop.ts`);
   console.log("=".repeat(70));
@@ -201,7 +198,7 @@ async function main() {
   console.log(`Decimals         : ${decimals}`);
   row("Total Supply", totalSupply, decimals, "APM (ERC-20 apM Coin)");
 
-  console.log("\n[Foundation Wallets - excluded from airdrop]");
+  console.log("\n[Foundation Wallets - excluded from Genesis Allocation]");
   const walletBalances: Record<string, bigint> = {};
   let foundationTotal = 0n;
   for (const [label, addr] of Object.entries(FOUNDATION_WALLETS)) {

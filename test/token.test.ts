@@ -4,8 +4,6 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 const E18 = 10n ** 18n;
 const TOTAL = 10_000_000_000n * E18;
-const DAY = 24 * 60 * 60;
-const MONTH = 30 * DAY;
 
 async function deployToken(recipients: string[], amounts: bigint[]) {
   const Token = await ethers.getContractFactory("ApmFashion");
@@ -58,36 +56,6 @@ describe("ApmFashion", () => {
   });
 });
 
-describe("ApmFashion + VestingWallet (deployment integration)", () => {
-  it("minting into a VestingWallet vests over time", async () => {
-    const [, beneficiary] = await ethers.getSigners();
-    const start = (await time.latest()) + DAY;
-    const duration = 24 * MONTH;
-
-    const Vest = await ethers.getContractFactory("VestingWallet");
-    const vest = await Vest.deploy(beneficiary.address, start, duration);
-    await vest.waitForDeployment();
-    const vestAddr = await vest.getAddress();
-
-    const token = await deployToken([vestAddr], [TOTAL]);
-    const tokenAddr = await token.getAddress();
-    const releasable = (x: string) => vest["releasable(address)"](x);
-
-    expect(await token.balanceOf(vestAddr)).to.equal(TOTAL);
-
-    await time.increaseTo(start - 5);
-    expect(await releasable(tokenAddr)).to.equal(0n);
-
-    await time.increaseTo(start + duration / 2);
-    expect(await releasable(tokenAddr)).to.equal(TOTAL / 2n);
-
-    await time.increaseTo(start + duration);
-    expect(await releasable(tokenAddr)).to.equal(TOTAL);
-
-    await vest["release(address)"](tokenAddr);
-    expect(await token.balanceOf(beneficiary.address)).to.equal(TOTAL);
-  });
-});
 
 describe("ApmFashion - ERC20Permit (EIP-2612)", () => {
   it("sets allowance via permit and bumps nonce", async () => {

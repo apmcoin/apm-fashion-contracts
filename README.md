@@ -57,7 +57,7 @@ BSC_RPC=
 BSC_TESTNET_RPC=
 ```
 
-Allocations are read from `config/allocations.csv`: `pool,address,amount` (amount in whole tokens, sum must equal 10,000,000,000)
+Amounts are read from `config/allocations-calc.json` and recipient addresses from `config/recipients.json`.
 
 ```bash
 npm run deploy:bscTestnet
