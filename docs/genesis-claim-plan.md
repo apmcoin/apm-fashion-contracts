@@ -10,7 +10,8 @@
 - Claims are divided across 36 monthly rounds.
 - A missed round does not carry forward.
 - The claim contract has no owner or administrative withdrawal function.
-- Unclaimed tokens from an expired round are sent to the dead address.
+- Unclaimed tokens from an expired round are sent to the dead address and
+  become permanently unrecoverable without reducing ERC-20 `totalSupply`.
 
 ## Snapshot and Merkle commitment
 
@@ -56,7 +57,7 @@ amount = round < 35
 - Claims from previous rounds cannot be recovered in later rounds.
 - Integer division remainder is included in the account's final-round amount.
 
-## Expired-round burn
+## Expired-round dead-address transfer
 
 After a round ends, anyone may call the settlement function. Settlement sends
 the difference between that round's allocation and claimed amount to:
@@ -65,9 +66,12 @@ the difference between that round's allocation and claimed amount to:
 0x000000000000000000000000000000000000dEaD
 ```
 
+This permanently removes the tokens from circulation. It is a transfer to the
+dead address, not a supply-reducing ERC-20 burn.
+
 - Settlement is permissionless and independent from the claim function.
 - Multiple expired rounds may be settled in one transaction.
-- A round with no claimants burns its entire allocation.
+- A round with no claimants sends its entire allocation to the dead address.
 - The final round is settled by the same rule after its end timestamp.
 - Settled rounds cannot be claimed again or settled twice.
 

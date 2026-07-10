@@ -1,7 +1,7 @@
 {
   "name": "apm-fashion-contracts",
   "version": "1.0.0",
-  "description": "apM Fashion smart contracts. Includes the ownerless fixed-supply token and cliff-vesting wallets; more contracts to be added.",
+  "description": "apM Fashion ownerless fixed-supply token and 36-round Genesis claim contracts.",
   "license": "MIT",
   "scripts": {
     "compile": "hardhat compile",

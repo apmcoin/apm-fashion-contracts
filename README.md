@@ -11,6 +11,7 @@ ApmFashion (ownerless, BSC)
   │  Full supply minted once at deploy to 5 Safe accounts
   │
   ├─ Safe — Genesis Allocation   (~39.95%)  0xd9C0E369981747851Badfbb540bC1bAb693A143A
+  │    └─ GenesisClaim — ownerless, 36 monthly claim rounds
   ├─ Safe — Foundation           (25%)      0x2b6027A2aab2E865343eB5250D51Cd4fAFb73E12
   ├─ Safe — Rewards              (21%)      0x1d551e7d19eFaF70f01266481b5010d0C39c8aF0
   ├─ Safe — Investors            (5%)       0xB944a1ce8f7C691289aC90aa91B15804302F5d0F
@@ -19,7 +20,7 @@ ApmFashion (ownerless, BSC)
 Safe: Safe{Wallet} v1.4.1+L2 (BSC Mainnet), threshold 2/3
 ```
 
-The Genesis Allocation amount is derived from legacy ERC-20 apM Coin non-foundation holder supply × 5 (1:5 conversion ratio).
+The Genesis Allocation amount is derived from legacy ERC-20 apM Coin non-foundation holder supply × 5 (1:5 conversion ratio). Distribution follows the [Genesis Claim Specification](docs/genesis-claim-plan.md).
 
 ---
 
@@ -28,12 +29,14 @@ The Genesis Allocation amount is derived from legacy ERC-20 apM Coin non-foundat
 | File | Role |
 |---|---|
 | `contracts/ApmFashion.sol` | Token contract. ERC-20 + ERC-20Permit. Full supply minted once in the constructor to the given recipients. |
-| `contracts/Imports.sol` | Import file to include OZ contracts in Hardhat compilation scope. |
+| `contracts/GenesisClaim.sol` | Ownerless Merkle claim contract with 36 monthly rounds and dead-address handling for expired allocations. |
 | `scripts/deploy.ts` | Deploys the token with the 5 Safe addresses as recipients. Verifies on-chain balances post-deploy. |
 | `scripts/calcGenesisAirdrop.ts` | Queries Ethereum mainnet ERC-20 apM Coin → calculates Genesis Allocation → writes `allocations-calc.json` + `token-allocation.md`. |
 | `config/allocations-calc.json` | Per-pool wei-precise amounts. Source of truth for deploy inputs. |
 | `docs/token-allocation.md` | Human-readable view of `allocations-calc.json`. |
+| `docs/genesis-claim-plan.md` | Public Genesis claim and expired-round specification. |
 | `test/token.test.ts` | ApmFashion unit tests. |
+| `test/genesis-claim.test.ts` | GenesisClaim unit and boundary tests. |
 
 ---
 
