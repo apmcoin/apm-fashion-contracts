@@ -1,14 +1,41 @@
 import * as dotenv from "dotenv";
 dotenv.config();
-import { ethers } from "ethers";
+
 import * as fs from "fs";
 import * as path from "path";
+import { ethers } from "ethers";
+import { assertPlanHash, DeploymentPlan } from "./lib/allocation-plan";
 
-const TOKEN   = process.argv[2] ?? (() => { throw new Error("Usage: npx ts-node scripts/verify-onchain.ts <token_address> [testnet|mainnet]"); })();
-const NETWORK = process.argv[3] ?? "testnet";
-const TOTAL = 10_000_000_000n * 10n ** 18n;
+interface DeploymentRecord {
+  schemaVersion: number;
+  plan: DeploymentPlan;
+  contractAddress: string;
+  transactionHash: string;
+  blockNumber: number;
+  runtimeBytecodeHash: string;
+}
 
-const ABI = [
+const recordPath = process.argv[2];
+if (!recordPath) {
+  throw new Error("Usage: ts-node scripts/verify-onchain.ts <deployment-record.json>");
+}
+
+const record = JSON.parse(fs.readFileSync(path.resolve(recordPath), "utf8")) as DeploymentRecord;
+if (record.schemaVersion !== 1) throw new Error("Unsupported deployment record schemaVersion");
+assertPlanHash(record.plan);
+
+function rpcFor(networkName: string): string {
+  if (networkName === "bsc") {
+    return process.env.BSC_RPC ?? "https://bsc-dataseed.bnbchain.org";
+  }
+  if (networkName === "bscTestnet") {
+    return process.env.BSC_TESTNET_RPC ?? "https://data-seed-prebsc-1-s1.bnbchain.org:8545";
+  }
+  throw new Error(`Unsupported deployment network: ${networkName}`);
+}
+
+const TOKEN_ABI = [
+  "event Transfer(address indexed from, address indexed to, uint256 value)",
   "function totalSupply() view returns (uint256)",
   "function balanceOf(address) view returns (uint256)",
   "function name() view returns (string)",
@@ -18,72 +45,83 @@ const ABI = [
   "function owner() view returns (address)",
 ];
 
-const calc: { allocations: Array<{ pool: string; amountWei: string }> } =
-  JSON.parse(fs.readFileSync(path.join("config", "allocations-calc.json"), "utf8"));
-const recipients: Record<string, string> =
-  JSON.parse(fs.readFileSync(path.join("config", "recipients.json"), "utf8"));
-
-const pools = calc.allocations.map((a) => {
-  const address = recipients[a.pool];
-  if (!address) throw new Error(`No address for pool: ${a.pool}`);
-  return { pool: a.pool, address: ethers.getAddress(address), amountWei: BigInt(a.amountWei) };
-});
-
 async function main() {
-  const rpc = NETWORK === "mainnet"
-    ? (process.env.BSC_RPC ?? "https://bsc-rpc.publicnode.com")
-    : (process.env.BSC_TESTNET_RPC ?? "https://bsc-testnet-rpc.publicnode.com");
-  console.log(`Network : ${NETWORK}  RPC: ${rpc}`);
-  const provider = new ethers.JsonRpcProvider(rpc);
-  const token = new ethers.Contract(TOKEN, ABI, provider);
+  const provider = new ethers.JsonRpcProvider(rpcFor(record.plan.network));
+  const providerNetwork = await provider.getNetwork();
+  if (providerNetwork.chainId !== BigInt(record.plan.chainId)) {
+    throw new Error(`Connected chain ${providerNetwork.chainId} != record chain ${record.plan.chainId}`);
+  }
+
+  const address = ethers.getAddress(record.contractAddress);
+  const token = new ethers.Contract(address, TOKEN_ABI, provider);
+  const receipt = await provider.getTransactionReceipt(record.transactionHash);
+  if (!receipt) throw new Error(`Deployment receipt not found: ${record.transactionHash}`);
+  if (receipt.contractAddress?.toLowerCase() !== address.toLowerCase()) {
+    throw new Error(`Receipt contract ${receipt.contractAddress} != record contract ${address}`);
+  }
+  if (receipt.blockNumber !== record.blockNumber) throw new Error("Deployment block number mismatch");
 
   let ok = true;
+  const name: string = await token.name();
+  const symbol: string = await token.symbol();
+  const decimals: bigint = await token.decimals();
+  const totalSupply: bigint = await token.totalSupply();
+  const totalSupplyConstant: bigint = await token.TOTAL_SUPPLY();
 
-  const name     = await token.name();
-  const symbol   = await token.symbol();
-  const decimals = await token.decimals();
-  const ts       = await token.totalSupply();
-  const tsConst  = await token.TOTAL_SUPPLY();
+  if (name !== "apM Fashion") { console.error("FAIL name"); ok = false; }
+  if (symbol !== "APM") { console.error("FAIL symbol"); ok = false; }
+  if (Number(decimals) !== 18) { console.error("FAIL decimals"); ok = false; }
+  if (totalSupply !== BigInt(record.plan.totalSupplyWei)) { console.error("FAIL totalSupply"); ok = false; }
+  if (totalSupplyConstant !== BigInt(record.plan.totalSupplyWei)) {
+    console.error("FAIL TOTAL_SUPPLY");
+    ok = false;
+  }
 
-  console.log(`name()         : ${name}`);
-  console.log(`symbol()       : ${symbol}`);
-  console.log(`decimals()     : ${decimals}`);
-  console.log(`totalSupply()  : ${ts}`);
-  console.log(`TOTAL_SUPPLY() : ${tsConst}`);
-  console.log();
-
-  if (name !== "apM Fashion")   { console.error("FAIL name");     ok = false; }
-  if (symbol !== "APM")         { console.error("FAIL symbol");   ok = false; }
-  if (Number(decimals) !== 18)  { console.error("FAIL decimals"); ok = false; }
-  if (ts !== TOTAL)             { console.error(`FAIL totalSupply`); ok = false; }
-  if (tsConst !== TOTAL)        { console.error(`FAIL TOTAL_SUPPLY`); ok = false; }
+  const runtimeCode = await provider.getCode(address);
+  if (ethers.keccak256(runtimeCode) !== record.runtimeBytecodeHash) {
+    console.error("FAIL runtime bytecode hash");
+    ok = false;
+  }
 
   try {
     await token.owner();
     console.error("FAIL ownerless: owner() did not revert");
     ok = false;
   } catch {
-    console.log("owner()        : [reverts — ownerless confirmed]");
-  }
-  console.log();
-
-  let sumBal = 0n;
-  for (const p of pools) {
-    const bal: bigint = await token.balanceOf(p.address);
-    const pass = bal === p.amountWei;
-    console.log(`[${pass ? "ok  " : "FAIL"}] ${p.pool.padEnd(22)} ${p.address}  ${bal}`);
-    if (!pass) { console.error(`        expected: ${p.amountWei}`); ok = false; }
-    sumBal += bal;
+    console.log("[ok] ownerless");
   }
 
-  console.log();
-  const sumPass = sumBal === TOTAL;
-  console.log(`[${sumPass ? "ok  " : "FAIL"}] sum(balances) == TOTAL_SUPPLY : ${sumBal}`);
-  if (!sumPass) ok = false;
+  const transferInterface = new ethers.Interface(TOKEN_ABI);
+  const minted = new Map<string, bigint>();
+  for (const log of receipt.logs) {
+    if (log.address.toLowerCase() !== address.toLowerCase()) continue;
+    try {
+      const parsed = transferInterface.parseLog({ topics: [...log.topics], data: log.data });
+      if (parsed?.name !== "Transfer" || parsed.args[0] !== ethers.ZeroAddress) continue;
+      const recipient = (parsed.args[1] as string).toLowerCase();
+      minted.set(recipient, (minted.get(recipient) ?? 0n) + (parsed.args[2] as bigint));
+    } catch {
+      // Ignore non-Transfer logs from the token contract.
+    }
+  }
 
-  console.log();
+  for (const allocation of record.plan.allocations) {
+    const actual = minted.get(allocation.recipient.toLowerCase()) ?? 0n;
+    const expected = BigInt(allocation.amountWei);
+    if (actual !== expected) {
+      console.error(`FAIL initial mint ${allocation.name}: ${actual} != ${expected}`);
+      ok = false;
+    } else {
+      const currentBalance: bigint = await token.balanceOf(allocation.recipient);
+      console.log(`[ok] ${allocation.name}: minted=${actual}, currentBalance=${currentBalance}`);
+    }
+  }
+
   console.log(ok ? "ALL CHECKS PASSED" : "ONE OR MORE CHECKS FAILED");
   if (!ok) process.exitCode = 1;
 }
 
-main().catch(e => { console.error(e); process.exitCode = 1; });
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

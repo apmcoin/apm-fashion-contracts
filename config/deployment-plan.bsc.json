@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "contract": "ApmFashion",
+  "network": "bsc",
+  "chainId": 56,
+  "policyHash": "sha256:cc39a0dbf553cabb3557f8cbf05948bf8f062c45f99a8b57a509b4ac06349dfc",
+  "recipientsHash": "sha256:79472d90ba67ace43e5be2e688851e29d95b7a66b63478aecfb48c9afe9a128c",
+  "totalSupplyWei": "10000000000000000000000000000",
+  "allocations": [
+    {
+      "id": "ecosystem_network_growth",
+      "name": "Ecosystem & Network Growth",
+      "shareBps": 3100,
+      "amountTokens": "3100000000",
+      "amountWei": "3100000000000000000000000000",
+      "recipient": "0xd9C0E369981747851Badfbb540bC1bAb693A143A"
+    },
+    {
+      "id": "foundation",
+      "name": "Foundation",
+      "shareBps": 2500,
+      "amountTokens": "2500000000",
+      "amountWei": "2500000000000000000000000000",
+      "recipient": "0x2b6027A2aab2E865343eB5250D51Cd4fAFb73E12"
+    },
+    {
+      "id": "rewards",
+      "name": "Rewards",
+      "shareBps": 3000,
+      "amountTokens": "3000000000",
+      "amountWei": "3000000000000000000000000000",
+      "recipient": "0x1d551e7d19eFaF70f01266481b5010d0C39c8aF0"
+    },
+    {
+      "id": "investors",
+      "name": "Investors",
+      "shareBps": 500,
+      "amountTokens": "500000000",
+      "amountWei": "500000000000000000000000000",
+      "recipient": "0xB944a1ce8f7C691289aC90aa91B15804302F5d0F"
+    },
+    {
+      "id": "exchange_allocation",
+      "name": "Exchange Allocation",
+      "shareBps": 700,
+      "amountTokens": "700000000",
+      "amountWei": "700000000000000000000000000",
+      "recipient": "0x8495a2fDc58933B59345F5f83e74aE7b033b3A4e"
+    },
+    {
+      "id": "liquidity_supply",
+      "name": "Liquidity Supply",
+      "shareBps": 200,
+      "amountTokens": "200000000",
+      "amountWei": "200000000000000000000000000",
+      "recipient": "0xC50e81d6f01415C5c713dDb805596b914D39e5dD"
+    }
+  ],
+  "constructorArgs": {
+    "recipients": [
+      "0xd9C0E369981747851Badfbb540bC1bAb693A143A",
+      "0x2b6027A2aab2E865343eB5250D51Cd4fAFb73E12",
+      "0x1d551e7d19eFaF70f01266481b5010d0C39c8aF0",
+      "0xB944a1ce8f7C691289aC90aa91B15804302F5d0F",
+      "0x8495a2fDc58933B59345F5f83e74aE7b033b3A4e",
+      "0xC50e81d6f01415C5c713dDb805596b914D39e5dD"
+    ],
+    "amounts": [
+      "3100000000000000000000000000",
+      "2500000000000000000000000000",
+      "3000000000000000000000000000",
+      "500000000000000000000000000",
+      "700000000000000000000000000",
+      "200000000000000000000000000"
+    ]
+  },
+  "planHash": "sha256:0fc85371d054ae58a2c7b3b494b1b4ad597514e96d17dd164a3625afce062a2a"
+}

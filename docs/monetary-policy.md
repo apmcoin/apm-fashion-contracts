@@ -1,4 +1,4 @@
-# apM Fashion (APM) — Monetary Policy
+# apM Fashion (APM) - Monetary Policy
 
 ## Supply
 
@@ -6,38 +6,34 @@
 |---|---|
 | Total Supply | 10,000,000,000 APM |
 | Decimals | 18 |
-| Mintable | No |
+| Mintable after deployment | No |
 | Supply-reducing burn function | No |
 | Pausable | No |
-| Owner | None (ownerless) |
+| Contract owner | None |
 
-Total supply is minted once at deployment. No mechanism exists to increase or decrease it. Expired Genesis claim allocations are transferred to the dead address and become unrecoverable, but this does not reduce ERC-20 `totalSupply`.
+The complete supply is minted once during deployment. The token contract has no
+mechanism to increase or decrease `totalSupply` afterward.
 
 ## Allocation
 
 | Pool | Amount (APM) | Share |
-|---|---|---|
-| Genesis Allocation | 3,995,287,829.626... | ~39.95% |
+|---|---:|---:|
+| Ecosystem & Network Growth | 3,100,000,000 | 31.00% |
 | Foundation | 2,500,000,000 | 25.00% |
-| Rewards | 2,100,000,000 | 21.00% |
+| Rewards | 3,000,000,000 | 30.00% |
 | Investors | 500,000,000 | 5.00% |
-| Exchange Allocation | 904,712,170.373... | ~9.05% |
-| **Total** | **10,000,000,000** | **100%** |
+| Exchange Allocation | 700,000,000 | 7.00% |
+| Liquidity Supply | 200,000,000 | 2.00% |
+| **Total** | **10,000,000,000** | **100.00%** |
 
-Full wei-precise amounts: [docs/token-allocation.md](token-allocation.md)
+The machine-readable policy is maintained in
+[`config/tokenomics.json`](../config/tokenomics.json). Exact wei amounts,
+recipient addresses, and policy checksums are fixed in the reviewed
+[BSC deployment plan](../config/deployment-plan.bsc.json).
 
-## Release Schedule
+## Release Controls
 
-| Pool | Schedule |
-|---|---|
-| Genesis Allocation | [36 monthly claim rounds](genesis-claim-plan.md) |
-| Foundation | 1-year cliff, 36-month linear |
-| Rewards | 24-month linear |
-| Investors | 1-year cliff, 24-month linear |
-| Exchange Allocation | Listing-dependent unlock |
-
-Non-Genesis vesting parameters are subject to adjustment prior to TGE.
-
-## Genesis Allocation
-
-The Genesis Allocation is derived from the legacy ERC-20 apM Coin (Ethereum mainnet) non-foundation holder supply at a 1:5 conversion ratio. See [docs/token-allocation.md](token-allocation.md) for derivation details and the [Genesis Claim Specification](genesis-claim-plan.md) for claim and expired-round rules.
+Pool release schedules are defined in the approved Token Release Schedule. They
+are not encoded in `ApmFashion.sol`, which mints each pool allocation to its
+designated recipient during deployment. Multisig configuration and release
+operations must be verified separately from the token contract audit.
