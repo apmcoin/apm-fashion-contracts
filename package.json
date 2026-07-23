@@ -1,15 +1,18 @@
 {
   "name": "apm-fashion-contracts",
   "version": "1.0.0",
-  "description": "apM Fashion ownerless fixed-supply token and 36-round Genesis claim contracts.",
+  "description": "apM Fashion ownerless fixed-supply token deployment repository.",
   "license": "MIT",
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
     "flatten": "hardhat flatten contracts/ApmFashion.sol > flattened/ApmFashion.sol",
     "build": "hardhat compile && npm run flatten",
+    "prepare:bscTestnet": "ts-node scripts/prepareDeployment.ts bscTestnet",
+    "prepare:bsc": "ts-node scripts/prepareDeployment.ts bsc",
     "deploy:bscTestnet": "hardhat run scripts/deploy.ts --network bscTestnet",
-    "deploy:bsc": "hardhat run scripts/deploy.ts --network bsc"
+    "deploy:bsc": "hardhat run scripts/deploy.ts --network bsc",
+    "verify:onchain": "ts-node scripts/verify-onchain.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "5.0.0",

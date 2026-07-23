@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "token": {
+    "name": "apM Fashion",
+    "symbol": "APM",
+    "decimals": 18,
+    "totalSupplyTokens": "10000000000"
+  },
+  "pools": [
+    {
+      "id": "ecosystem_network_growth",
+      "name": "Ecosystem & Network Growth",
+      "shareBps": 3100
+    },
+    {
+      "id": "foundation",
+      "name": "Foundation",
+      "shareBps": 2500
+    },
+    {
+      "id": "rewards",
+      "name": "Rewards",
+      "shareBps": 3000
+    },
+    {
+      "id": "investors",
+      "name": "Investors",
+      "shareBps": 500
+    },
+    {
+      "id": "exchange_allocation",
+      "name": "Exchange Allocation",
+      "shareBps": 700
+    },
+    {
+      "id": "liquidity_supply",
+      "name": "Liquidity Supply",
+      "shareBps": 200
+    }
+  ]
+}

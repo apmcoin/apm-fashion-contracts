@@ -1,78 +1,97 @@
 # apM Fashion Contracts
 
-BEP-20 apM Fashion (`APM`) token deployment repository.
-
----
+BEP-20 apM Fashion (`APM`) token policy, deployment, and verification repository.
 
 ## Architecture
 
-```
-ApmFashion (ownerless, BSC)
-  │  Full supply minted once at deploy to 5 Safe accounts
-  │
-  ├─ Safe — Genesis Allocation   (~39.95%)  0xd9C0E369981747851Badfbb540bC1bAb693A143A
-  │    └─ GenesisClaim — ownerless, 36 monthly claim rounds
-  ├─ Safe — Foundation           (25%)      0x2b6027A2aab2E865343eB5250D51Cd4fAFb73E12
-  ├─ Safe — Rewards              (21%)      0x1d551e7d19eFaF70f01266481b5010d0C39c8aF0
-  ├─ Safe — Investors            (5%)       0xB944a1ce8f7C691289aC90aa91B15804302F5d0F
-  └─ Safe — Exchange Allocation  (~9.05%)   0x8495a2fDc58933B59345F5f83e74aE7b033b3A4e
-
-Safe: Safe{Wallet} v1.4.1+L2 (BSC Mainnet), threshold 2/3
+```text
+config/tokenomics.json ----\
+                            +--> prepareDeployment --> deployment plan
+config/recipients.json ----/                                  |
+                                                               v
+                                      ApmFashion deployment --> record --> verification
 ```
 
-The Genesis Allocation amount is derived from legacy ERC-20 apM Coin non-foundation holder supply × 5 (1:5 conversion ratio). Distribution follows the [Genesis Claim Specification](docs/genesis-claim-plan.md).
+`ApmFashion` is an ownerless ERC-20 with ERC-2612 permit support. The complete
+10,000,000,000 APM supply is minted once at deployment to six designated pool
+recipients.
 
----
+| Pool | Share |
+|---|---:|
+| Ecosystem & Network Growth | 31% |
+| Foundation | 25% |
+| Rewards | 30% |
+| Investors | 5% |
+| Exchange Allocation | 7% |
+| Liquidity Supply | 2% |
 
-## Files
+The token contract does not contain minting, ownership, pause, burn, or vesting
+administration after deployment. Pool release schedules are governed by the
+approved Token Release Schedule and the designated multisig accounts.
 
-| File | Role |
-|---|---|
-| `contracts/ApmFashion.sol` | Token contract. ERC-20 + ERC-20Permit. Full supply minted once in the constructor to the given recipients. |
-| `contracts/GenesisClaim.sol` | Ownerless Merkle claim contract with 36 monthly rounds and dead-address handling for expired allocations. |
-| `scripts/deploy.ts` | Deploys the token with the 5 Safe addresses as recipients. Verifies on-chain balances post-deploy. |
-| `scripts/calcGenesisAirdrop.ts` | Queries Ethereum mainnet ERC-20 apM Coin → calculates Genesis Allocation → writes `allocations-calc.json` + `token-allocation.md`. |
-| `config/allocations-calc.json` | Per-pool wei-precise amounts. Source of truth for deploy inputs. |
-| `docs/token-allocation.md` | Human-readable view of `allocations-calc.json`. |
-| `docs/genesis-claim-plan.md` | Public Genesis claim and expired-round specification. |
-| `test/token.test.ts` | ApmFashion unit tests. |
-| `test/genesis-claim.test.ts` | GenesisClaim unit and boundary tests. |
+## Deployment Plan
 
----
+`config/tokenomics.json` is the allocation policy source of truth. Recipient
+addresses are configured separately by network in `config/recipients.json`.
+Plan generation validates six unique pool IDs and recipients, a 10,000
+basis-point total, exact integer wei amounts, and the 10 billion APM supply
+checksum.
+
+```bash
+npm run prepare:bscTestnet
+npm run prepare:bsc
+```
+
+The resulting `config/deployment-plan.<network>.json` fixes the chain ID,
+recipients, amounts, constructor arguments, policy hash, recipient hash, and
+final plan hash. It must be reviewed before deployment. Deployment rejects the
+plan if it no longer matches the current tokenomics or recipient configuration.
 
 ## Development
 
 ```bash
-npm install
+npm ci
 npm test
-npm run build   # compile + flatten → flattened/ApmFashion.sol
+npm run build
 ```
 
----
+`build` compiles the contracts and regenerates `flattened/ApmFashion.sol`.
 
-## Deploy
+## Deployment
 
-Set `.env`:
+Set the required values in `.env`:
 
-```
+```text
 DEPLOYER_PRIVATE_KEY=
 BSC_RPC=
 BSC_TESTNET_RPC=
 ```
 
-Amounts are read from `config/allocations-calc.json` and recipient addresses from `config/recipients.json`.
+Deploy only after the matching deployment plan has been reviewed:
 
 ```bash
 npm run deploy:bscTestnet
 npm run deploy:bsc
 ```
 
----
-
-## Genesis Allocation Calculation
+Deployment writes a self-contained record under `deployments/<chainId>/`. The
+record includes the approved plan, token address, deployment transaction,
+block number, and runtime bytecode hash.
 
 ```bash
-npx ts-node scripts/calcGenesisAirdrop.ts
+npm run verify:onchain -- deployments/<chainId>/<tokenAddress>.json
 ```
 
-Requires `ETH_RPC` in `.env`. Regenerates `config/allocations-calc.json` and `docs/token-allocation.md`.
+Verification uses the deployment-time record rather than mutable current
+configuration. It validates the chain, deployment receipt, initial mint events,
+token metadata, total supply, ownerless behavior, and runtime bytecode hash.
+
+## Audit Scope
+
+The CertiK assessment covers only `contracts/ApmFashion.sol` at commit
+`2bfbf42328e7eaee31fbd2ce17c91c796d1b7d92`. Allocation policy, recipient
+configuration, release schedules, deployment scripts, and operational controls
+are outside that source-code audit scope.
+
+- [Audited source](https://github.com/apmcoin/apm-fashion-contracts/blob/2bfbf42328e7eaee31fbd2ce17c91c796d1b7d92/contracts/ApmFashion.sol)
+- [CertiK report](docs/CertiK-REP-apM-Fashion-Audit-V1.pdf)

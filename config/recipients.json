@@ -1,7 +1,27 @@
 {
-  "Genesis Allocation": "0xd9C0E369981747851Badfbb540bC1bAb693A143A",
-  "Foundation":         "0x2b6027A2aab2E865343eB5250D51Cd4fAFb73E12",
-  "Rewards":            "0x1d551e7d19eFaF70f01266481b5010d0C39c8aF0",
-  "Investors":          "0xB944a1ce8f7C691289aC90aa91B15804302F5d0F",
-  "Exchange Allocation":"0x8495a2fDc58933B59345F5f83e74aE7b033b3A4e"
+  "schemaVersion": 1,
+  "networks": {
+    "bsc": {
+      "chainId": 56,
+      "recipients": {
+        "ecosystem_network_growth": "0xd9C0E369981747851Badfbb540bC1bAb693A143A",
+        "foundation": "0x2b6027A2aab2E865343eB5250D51Cd4fAFb73E12",
+        "rewards": "0x1d551e7d19eFaF70f01266481b5010d0C39c8aF0",
+        "investors": "0xB944a1ce8f7C691289aC90aa91B15804302F5d0F",
+        "exchange_allocation": "0x8495a2fDc58933B59345F5f83e74aE7b033b3A4e",
+        "liquidity_supply": "0xC50e81d6f01415C5c713dDb805596b914D39e5dD"
+      }
+    },
+    "bscTestnet": {
+      "chainId": 97,
+      "recipients": {
+        "ecosystem_network_growth": null,
+        "foundation": null,
+        "rewards": null,
+        "investors": null,
+        "exchange_allocation": null,
+        "liquidity_supply": null
+      }
+    }
+  }
 }
