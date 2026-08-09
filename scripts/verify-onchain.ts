@@ -7,7 +7,6 @@ import { ethers } from "ethers";
 import { assertPlanHash, DeploymentPlan } from "./lib/allocation-plan";
 
 interface DeploymentRecord {
-  schemaVersion: number;
   plan: DeploymentPlan;
   contractAddress: string;
   transactionHash: string;
@@ -21,7 +20,6 @@ if (!recordPath) {
 }
 
 const record = JSON.parse(fs.readFileSync(path.resolve(recordPath), "utf8")) as DeploymentRecord;
-if (record.schemaVersion !== 1) throw new Error("Unsupported deployment record schemaVersion");
 assertPlanHash(record.plan);
 
 function rpcFor(networkName: string): string {
@@ -105,15 +103,32 @@ async function main() {
     }
   }
 
+  const expectedByRecipient = new Map<string, { recipient: string; amount: bigint; pools: string[] }>();
   for (const allocation of record.plan.allocations) {
-    const actual = minted.get(allocation.recipient.toLowerCase()) ?? 0n;
-    const expected = BigInt(allocation.amountWei);
+    const key = allocation.recipient.toLowerCase();
+    const existing = expectedByRecipient.get(key);
+    if (existing) {
+      existing.amount += BigInt(allocation.amountWei);
+      existing.pools.push(allocation.name);
+    } else {
+      expectedByRecipient.set(key, {
+        recipient: allocation.recipient,
+        amount: BigInt(allocation.amountWei),
+        pools: [allocation.name],
+      });
+    }
+  }
+
+  for (const expectedRecipient of expectedByRecipient.values()) {
+    const actual = minted.get(expectedRecipient.recipient.toLowerCase()) ?? 0n;
+    const expected = expectedRecipient.amount;
+    const label = expectedRecipient.pools.join(" + ");
     if (actual !== expected) {
-      console.error(`FAIL initial mint ${allocation.name}: ${actual} != ${expected}`);
+      console.error(`FAIL initial mint ${label}: ${actual} != ${expected}`);
       ok = false;
     } else {
-      const currentBalance: bigint = await token.balanceOf(allocation.recipient);
-      console.log(`[ok] ${allocation.name}: minted=${actual}, currentBalance=${currentBalance}`);
+      const currentBalance: bigint = await token.balanceOf(expectedRecipient.recipient);
+      console.log(`[ok] ${label}: minted=${actual}, currentBalance=${currentBalance}`);
     }
   }
 

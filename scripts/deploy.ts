@@ -67,21 +67,35 @@ async function main() {
     ok = false;
     console.error(`  [FAIL] totalSupply ${totalSupply} != ${plan.totalSupplyWei}`);
   }
+  const expectedByRecipient = new Map<string, { recipient: string; amount: bigint; pools: string[] }>();
   for (const allocation of plan.allocations) {
-    const balance = await token.balanceOf(allocation.recipient);
-    const expected = BigInt(allocation.amountWei);
+    const key = allocation.recipient.toLowerCase();
+    const existing = expectedByRecipient.get(key);
+    if (existing) {
+      existing.amount += BigInt(allocation.amountWei);
+      existing.pools.push(allocation.name);
+    } else {
+      expectedByRecipient.set(key, {
+        recipient: allocation.recipient,
+        amount: BigInt(allocation.amountWei),
+        pools: [allocation.name],
+      });
+    }
+  }
+  for (const expectedRecipient of expectedByRecipient.values()) {
+    const balance = await token.balanceOf(expectedRecipient.recipient);
+    const expected = expectedRecipient.amount;
     if (balance !== expected) {
       ok = false;
-      console.error(`  [FAIL] ${allocation.name}: ${balance} != ${expected}`);
+      console.error(`  [FAIL] ${expectedRecipient.pools.join(" + ")}: ${balance} != ${expected}`);
     } else {
-      console.log(`  [ok] ${allocation.name}: ${balance}`);
+      console.log(`  [ok] ${expectedRecipient.pools.join(" + ")}: ${balance}`);
     }
   }
   if (!ok) throw new Error("post-deploy verification FAILED");
 
   const runtimeCode = await ethers.provider.getCode(tokenAddr);
   const deploymentRecord = {
-    schemaVersion: 1,
     plan,
     contractAddress: tokenAddr,
     transactionHash: deploymentTransaction.hash,

@@ -10,20 +10,30 @@ config/tokenomics.json ----\
 config/recipients.json ----/                                  |
                                                                v
                                       ApmFashion deployment --> record --> verification
+
+Legacy holder snapshot --> Merkle root --> GenesisClaim --> 36 monthly rounds
 ```
 
 `ApmFashion` is an ownerless ERC-20 with ERC-2612 permit support. The complete
-10,000,000,000 APM supply is minted once at deployment to six designated pool
-recipients.
+10,000,000,000 APM supply is minted once at deployment across seven pool
+allocations.
 
-| Pool | Share |
-|---|---:|
-| Ecosystem & Network Growth | 31% |
-| Foundation | 25% |
-| Rewards | 30% |
-| Investors | 5% |
-| Exchange Allocation | 7% |
-| Liquidity Supply | 2% |
+| Pool | Amount (APM) | Share |
+|---|---:|---:|
+| Genesis Allocation | 1,598,200,000 | 15.982% |
+| Ecosystem & Network Growth | 1,501,800,000 | 15.018% |
+| Foundation | 2,500,000,000 | 25% |
+| Rewards | 3,000,000,000 | 30% |
+| Investors | 500,000,000 | 5% |
+| Exchange Allocation | 700,000,000 | 7% |
+| Liquidity Supply | 200,000,000 | 2% |
+
+Genesis Allocation gives eligible legacy ERC-20 apM Coin holders 2 APM for
+each eligible legacy token. The eligible legacy holder supply is 799,100,000
+apM Coin, resulting in a 1,598,200,000 APM allocation. Claims run for 36 monthly
+rounds through the ownerless `GenesisClaim` contract. Missed rounds do not carry
+forward. The final round contains the remaining pool allocation, and every
+expired round's unclaimed amount is transferred to the dead address.
 
 The token contract does not contain minting, ownership, pause, burn, or vesting
 administration after deployment. Pool release schedules are governed by the
@@ -33,9 +43,8 @@ approved Token Release Schedule and the designated multisig accounts.
 
 `config/tokenomics.json` is the allocation policy source of truth. Recipient
 addresses are configured separately by network in `config/recipients.json`.
-Plan generation validates six unique pool IDs and recipients, a 10,000
-basis-point total, exact integer wei amounts, and the 10 billion APM supply
-checksum.
+Plan generation validates seven pool IDs, recipient addresses, exact whole-token
+amounts, and the 10 billion APM supply checksum.
 
 ```bash
 npm run prepare:bscTestnet
@@ -90,8 +99,8 @@ token metadata, total supply, ownerless behavior, and runtime bytecode hash.
 
 The CertiK assessment covers only `contracts/ApmFashion.sol` at commit
 `2bfbf42328e7eaee31fbd2ce17c91c796d1b7d92`. Allocation policy, recipient
-configuration, release schedules, deployment scripts, and operational controls
-are outside that source-code audit scope.
+configuration, `GenesisClaim`, release schedules, deployment scripts, and
+operational controls are outside that source-code audit scope.
 
 - [Audited source](https://github.com/apmcoin/apm-fashion-contracts/blob/2bfbf42328e7eaee31fbd2ce17c91c796d1b7d92/contracts/ApmFashion.sol)
 - [CertiK report](docs/CertiK-REP-apM-Fashion-Audit-V1.pdf)
