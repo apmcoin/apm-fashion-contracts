@@ -127,7 +127,7 @@ export function buildAllocationArtifact(): AllocationArtifact {
     };
   });
   const sum = allocations.reduce((total, allocation) => total + BigInt(allocation.amountWei), 0n);
-  if (sum !== totalSupplyWei) throw new Error("Allocation checksum failed");
+  if (sum !== totalSupplyWei) throw new Error("Allocation total does not match total supply");
 
   return {
     policyHash: hashValue(policy),

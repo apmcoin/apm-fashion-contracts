@@ -20,31 +20,30 @@ allocations.
 
 | Pool | Amount (APM) | Share |
 |---|---:|---:|
+| Rewards | 3,000,000,000 | 30% |
+| Foundation | 2,500,000,000 | 25% |
 | Genesis Allocation | 1,598,200,000 | 15.982% |
 | Ecosystem & Network Growth | 1,501,800,000 | 15.018% |
-| Foundation | 2,500,000,000 | 25% |
-| Rewards | 3,000,000,000 | 30% |
-| Investors | 500,000,000 | 5% |
 | Exchange Allocation | 700,000,000 | 7% |
+| Investors | 500,000,000 | 5% |
 | Liquidity Supply | 200,000,000 | 2% |
 
 Genesis Allocation gives eligible legacy ERC-20 apM Coin holders 2 APM for
 each eligible legacy token. The eligible legacy holder supply is 799,100,000
 apM Coin, resulting in a 1,598,200,000 APM allocation. Claims run for 36 monthly
 rounds through the ownerless `GenesisClaim` contract. Missed rounds do not carry
-forward. The final round contains the remaining pool allocation, and every
-expired round's unclaimed amount is transferred to the dead address.
+forward. The final round includes each holder's division remainder. After a
+round expires, anyone can settle it and transfer its unclaimed allocation to the
+dead address.
 
-The token contract does not contain minting, ownership, pause, burn, or vesting
-administration after deployment. Pool release schedules are governed by the
-approved Token Release Schedule and the designated multisig accounts.
+`ApmFashion` does not enforce vesting or release schedules.
 
 ## Deployment Plan
 
 `config/tokenomics.json` is the allocation policy source of truth. Recipient
 addresses are configured separately by network in `config/recipients.json`.
 Plan generation validates seven pool IDs, recipient addresses, exact whole-token
-amounts, and the 10 billion APM supply checksum.
+amounts, and the 10 billion APM total supply.
 
 ```bash
 npm run prepare:bscTestnet
