@@ -49,18 +49,12 @@ describe("allocation toolchain", () => {
     expect(() => assertPlanHash(tampered)).to.throw("Deployment plan hash mismatch");
   });
 
-  it("keeps logical pools separate when they share one mint destination", () => {
+  it("rejects a recipient shared by multiple pools", () => {
     const network = validNetwork();
     network.recipients.exchange_allocation = network.recipients.ecosystem_network_growth;
-    const plan = buildDeploymentPlan(buildAllocationArtifact(), "bsc", network);
-
-    expect(plan.allocations).to.have.length(7);
-    expect(plan.constructorArgs.recipients).to.have.length(7);
-    expect(plan.constructorArgs.recipients[1]).to.equal(plan.constructorArgs.recipients[5]);
-    expect([plan.constructorArgs.amounts[1], plan.constructorArgs.amounts[5]]).to.deep.equal([
-      "1501800000000000000000000000",
-      "700000000000000000000000000",
-    ]);
+    expect(() => buildDeploymentPlan(buildAllocationArtifact(), "bsc", network)).to.throw(
+      "Duplicate recipient for ecosystem_network_growth and exchange_allocation"
+    );
   });
 
   it("rejects missing recipients", () => {

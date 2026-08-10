@@ -3,7 +3,7 @@
   "network": "bsc",
   "chainId": 56,
   "policyHash": "sha256:20983b349f9986e2e8acd5a4f1dc07806214163c1e0090c4b49f7b467ead20ab",
-  "recipientsHash": "sha256:534132bf1f051aa673ce54859770c9646a11c2a8388355bd3085847f328c0293",
+  "recipientsHash": "sha256:9a68a6950cbbf809dc0b2cf9b5e8d7f4197dd90b3999229a7b15f63c24b86b3b",
   "totalSupplyWei": "10000000000000000000000000000",
   "allocations": [
     {
@@ -46,7 +46,7 @@
       "name": "Exchange Allocation",
       "amountTokens": "700000000",
       "amountWei": "700000000000000000000000000",
-      "recipient": "0x8495a2fDc58933B59345F5f83e74aE7b033b3A4e"
+      "recipient": "0xccE640A790a2dC42202e4fac0D43cB22c29E1ea9"
     },
     {
       "id": "liquidity_supply",
@@ -63,7 +63,7 @@
       "0x2b6027A2aab2E865343eB5250D51Cd4fAFb73E12",
       "0x1d551e7d19eFaF70f01266481b5010d0C39c8aF0",
       "0xB944a1ce8f7C691289aC90aa91B15804302F5d0F",
-      "0x8495a2fDc58933B59345F5f83e74aE7b033b3A4e",
+      "0xccE640A790a2dC42202e4fac0D43cB22c29E1ea9",
       "0xC50e81d6f01415C5c713dDb805596b914D39e5dD"
     ],
     "amounts": [
@@ -76,5 +76,5 @@
       "200000000000000000000000000"
     ]
   },
-  "planHash": "sha256:fec0650770d3f7a205b260b7d0ff01870ef6cec6a23423855b4f91021719f59f"
+  "planHash": "sha256:2af0b33156123e8a7fc6fb6246549936c928abf0d3b990a4fcf3564c708562a4"
 }

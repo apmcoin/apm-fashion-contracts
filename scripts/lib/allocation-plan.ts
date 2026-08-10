@@ -161,6 +161,18 @@ export function buildDeploymentPlan(
     return { ...allocation, recipient };
   });
 
+  const recipientPools = new Map<string, string>();
+  for (const allocation of allocations) {
+    const key = allocation.recipient.toLowerCase();
+    const existingPool = recipientPools.get(key);
+    if (existingPool) {
+      throw new Error(
+        `Duplicate recipient for ${existingPool} and ${allocation.id}: ${allocation.recipient}`
+      );
+    }
+    recipientPools.set(key, allocation.id);
+  }
+
   const base = {
     contract: "ApmFashion" as const,
     network: networkName,
