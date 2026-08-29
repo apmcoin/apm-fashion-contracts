@@ -15,26 +15,13 @@ Legacy holder snapshot --> Merkle root --> GenesisClaim --> 36 monthly rounds
 ```
 
 `ApmFashion` is an ownerless ERC-20 with ERC-2612 permit support. The complete
-10,000,000,000 APM supply is minted once at deployment across seven pool
-allocations.
+10,000,000,000 APM supply is minted once at deployment. Allocation amounts and
+policy are documented in [Monetary Policy](docs/monetary-policy.md).
 
-| Pool | Amount (APM) | Share |
-|---|---:|---:|
-| Rewards | 3,000,000,000 | 30% |
-| Foundation | 2,500,000,000 | 25% |
-| Genesis Allocation | 1,598,200,000 | 15.982% |
-| Ecosystem & Network Growth | 1,501,800,000 | 15.018% |
-| Exchange Allocation | 700,000,000 | 7% |
-| Investors | 500,000,000 | 5% |
-| Liquidity Supply | 200,000,000 | 2% |
-
-Genesis Allocation gives eligible legacy ERC-20 apM Coin holders 2 APM for
-each eligible legacy token. The eligible legacy holder supply is 799,100,000
-apM Coin, resulting in a 1,598,200,000 APM allocation. Claims run for 36 monthly
-rounds through the ownerless `GenesisClaim` contract. Missed rounds do not carry
-forward. The final round includes each holder's division remainder. After a
-round expires, anyone can settle it and transfer its unclaimed allocation to the
-dead address.
+`GenesisClaim` distributes the Genesis Allocation through 36 monthly Merkle
+claim rounds. Missed rounds do not carry forward, and expired unclaimed amounts
+are settled to the dead address. The final round includes each holder's division
+remainder.
 
 `ApmFashion` does not enforce vesting or release schedules.
 
