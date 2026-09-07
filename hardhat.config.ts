@@ -8,10 +8,10 @@ const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY || "";
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.27", // OZ Wizard default; pinned exact
+    version: "0.8.27",
     settings: {
       optimizer: { enabled: true, runs: 200 },
-      evmVersion: "cancun", // BSC supports cancun (2024+ hardforks)
+      evmVersion: "cancun",
     },
   },
   networks: {

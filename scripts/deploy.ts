@@ -3,16 +3,6 @@ import * as fs from "fs";
 import * as path from "path";
 import { loadApprovedDeploymentPlan, ROOT_DIR } from "./lib/allocation-plan";
 
-/**
- * apM Fashion deployment.
- *
- * Loads a reviewed deployment plan derived from tokenomics and recipient
- * configuration, deploys ApmFashion, verifies the initial state, and writes
- * an immutable deployment record for independent verification.
- *
- * Switching networks: npm run deploy:bscTestnet  /  npm run deploy:bsc
- */
-
 async function main() {
   if (network.name !== "bsc" && network.name !== "bscTestnet") {
     throw new Error(`Unsupported deployment network: ${network.name}`);

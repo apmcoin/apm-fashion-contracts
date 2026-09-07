@@ -18,29 +18,22 @@ Legacy holder snapshot --> Merkle root --> GenesisClaim --> 36 monthly rounds
 10,000,000,000 APM supply is minted once at deployment. Allocation amounts and
 policy are documented in [Monetary Policy](docs/monetary-policy.md).
 
-`GenesisClaim` distributes the Genesis Allocation through 36 monthly Merkle
-claim rounds. Missed rounds do not carry forward, and expired unclaimed amounts
-are settled to the dead address. The final round includes each holder's division
-remainder.
+`GenesisClaim` provides 36 monthly Merkle-based claims for eligible legacy ERC-20
+apM Coin holders.
 
 `ApmFashion` does not enforce vesting or release schedules.
 
 ## Deployment Plan
 
-`config/tokenomics.json` is the allocation policy source of truth. Recipient
-addresses are configured separately by network in `config/recipients.json`.
-Plan generation validates seven pool IDs, recipient addresses, exact whole-token
-amounts, and the 10 billion APM total supply.
+Allocation amounts and recipient addresses are configured in `config/tokenomics.json`
+and `config/recipients.json`.
 
 ```bash
 npm run prepare:bscTestnet
 npm run prepare:bsc
 ```
 
-The resulting `config/deployment-plan.<network>.json` fixes the chain ID,
-recipients, amounts, constructor arguments, policy hash, recipient hash, and
-final plan hash. It must be reviewed before deployment. Deployment rejects the
-plan if it no longer matches the current tokenomics or recipient configuration.
+Review the generated `config/deployment-plan.<network>.json` before deployment.
 
 ## Development
 
@@ -69,17 +62,11 @@ npm run deploy:bscTestnet
 npm run deploy:bsc
 ```
 
-Deployment writes a self-contained record under `deployments/<chainId>/`. The
-record includes the approved plan, token address, deployment transaction,
-block number, and runtime bytecode hash.
+Deployment records are written under `deployments/<chainId>/`.
 
 ```bash
 npm run verify:onchain -- deployments/<chainId>/<tokenAddress>.json
 ```
-
-Verification uses the deployment-time record rather than mutable current
-configuration. It validates the chain, deployment receipt, initial mint events,
-token metadata, total supply, ownerless behavior, and runtime bytecode hash.
 
 ## Audit Scope
 
