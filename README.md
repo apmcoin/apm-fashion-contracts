@@ -6,6 +6,9 @@ Solidity contracts for apM Fashion.
 - [GenesisClaim](contracts/GenesisClaim.sol): Merkle-based token claims.
 - [Monetary Policy](docs/monetary-policy.md)
 
+BNB Smart Chain mainnet:
+[0x72a22fAA6a522C81A8F5d508381e18af3dA0921E](https://bscscan.com/token/0x72a22fAA6a522C81A8F5d508381e18af3dA0921E)
+
 ## Development
 
 ```bash
@@ -21,6 +24,7 @@ Local settings: `config/deployment.json` and `.env`, using the
 
 ```bash
 npm run deploy:bscTestnet
+npm run deploy:sepolia
 npm run deploy:bsc
 npm run verify:onchain -- deployments/<chainId>/<tokenAddress>.json
 ```
