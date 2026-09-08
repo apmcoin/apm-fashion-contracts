@@ -8,19 +8,22 @@
     "test": "hardhat test",
     "flatten": "hardhat flatten contracts/ApmFashion.sol > flattened/ApmFashion.sol",
     "build": "hardhat compile && npm run flatten",
-    "prepare:bscTestnet": "ts-node scripts/prepareDeployment.ts bscTestnet",
-    "prepare:bsc": "ts-node scripts/prepareDeployment.ts bsc",
-    "deploy:bscTestnet": "hardhat run scripts/deploy.ts --network bscTestnet",
-    "deploy:bsc": "hardhat run scripts/deploy.ts --network bsc",
+    "deploy:bscTestnet": "ts-node scripts/deploy.ts bscTestnet",
+    "deploy:bsc": "ts-node scripts/deploy.ts bsc",
     "verify:onchain": "ts-node scripts/verify-onchain.ts"
   },
   "devDependencies": {
+    "@ledgerhq/context-module": "2.5.0",
+    "@ledgerhq/device-management-kit": "1.9.0",
+    "@ledgerhq/device-signer-kit-ethereum": "1.18.0",
+    "@ledgerhq/device-transport-kit-node-hid": "1.0.1",
     "@nomicfoundation/hardhat-toolbox": "5.0.0",
     "@openzeppelin/contracts": "5.6.1",
     "@openzeppelin/merkle-tree": "1.0.8",
     "@types/node": "20.14.10",
     "dotenv": "16.4.5",
     "hardhat": "2.28.6",
+    "rxjs": "7.8.2",
     "ts-node": "10.9.2",
     "typescript": "5.4.5"
   }

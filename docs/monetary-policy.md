@@ -28,5 +28,4 @@ mechanism to increase or decrease `totalSupply` afterward.
 | **Total** | **10,000,000,000** | **100.00%** |
 
 Machine-readable allocation amounts are maintained in
-[`config/tokenomics.json`](../config/tokenomics.json). Recipient addresses are
-configured by network in [`config/recipients.json`](../config/recipients.json).
+[`config/tokenomics.json`](../config/tokenomics.json).

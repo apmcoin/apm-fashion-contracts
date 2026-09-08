@@ -8,3 +8,6 @@ typechain-types
 coverage
 coverage.json
 *.log
+local/
+config/deployment.json
+deployments/

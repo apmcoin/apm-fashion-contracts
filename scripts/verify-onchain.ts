@@ -1,142 +1,60 @@
-import * as dotenv from "dotenv";
-dotenv.config();
+import { readFileSync } from "node:fs";
+import { strict as assert } from "node:assert";
+import { Contract, getAddress, getCreateAddress, JsonRpcProvider, ZeroAddress } from "ethers";
+import { connectRpc, Network, networkSettings, tokenFactory, TOTAL_SUPPLY } from "./lib/deployment";
 
-import * as fs from "fs";
-import * as path from "path";
-import { ethers } from "ethers";
-import { assertPlanHash, DeploymentPlan } from "./lib/allocation-plan";
-
-interface DeploymentRecord {
-  plan: DeploymentPlan;
+export interface DeploymentRecord {
+  network: Network;
+  chainId: number;
+  deployer: string;
+  recipient: string;
   contractAddress: string;
   transactionHash: string;
-  blockNumber: number;
-  runtimeBytecodeHash: string;
 }
 
-const recordPath = process.argv[2];
-if (!recordPath) {
-  throw new Error("Usage: ts-node scripts/verify-onchain.ts <deployment-record.json>");
-}
-
-const record = JSON.parse(fs.readFileSync(path.resolve(recordPath), "utf8")) as DeploymentRecord;
-assertPlanHash(record.plan);
-
-function rpcFor(networkName: string): string {
-  if (networkName === "bsc") {
-    return process.env.BSC_RPC ?? "https://bsc-dataseed.bnbchain.org";
-  }
-  if (networkName === "bscTestnet") {
-    return process.env.BSC_TESTNET_RPC ?? "https://data-seed-prebsc-1-s1.bnbchain.org:8545";
-  }
-  throw new Error(`Unsupported deployment network: ${networkName}`);
-}
-
-const TOKEN_ABI = [
-  "event Transfer(address indexed from, address indexed to, uint256 value)",
-  "function totalSupply() view returns (uint256)",
-  "function balanceOf(address) view returns (uint256)",
-  "function name() view returns (string)",
-  "function symbol() view returns (string)",
-  "function decimals() view returns (uint8)",
-  "function TOTAL_SUPPLY() view returns (uint256)",
-  "function owner() view returns (address)",
-];
-
-async function main() {
-  const provider = new ethers.JsonRpcProvider(rpcFor(record.plan.network));
-  const providerNetwork = await provider.getNetwork();
-  if (providerNetwork.chainId !== BigInt(record.plan.chainId)) {
-    throw new Error(`Connected chain ${providerNetwork.chainId} != record chain ${record.plan.chainId}`);
-  }
-
-  const address = ethers.getAddress(record.contractAddress);
-  const token = new ethers.Contract(address, TOKEN_ABI, provider);
+export async function verifyDeployment(record: DeploymentRecord, provider: JsonRpcProvider) {
+  const { chainId } = networkSettings(record.network);
+  assert.equal(record.chainId, chainId, "Record chain mismatch");
+  assert.equal((await provider.getNetwork()).chainId, BigInt(chainId), "RPC chain mismatch");
   const receipt = await provider.getTransactionReceipt(record.transactionHash);
-  if (!receipt) throw new Error(`Deployment receipt not found: ${record.transactionHash}`);
-  if (receipt.contractAddress?.toLowerCase() !== address.toLowerCase()) {
-    throw new Error(`Receipt contract ${receipt.contractAddress} != record contract ${address}`);
-  }
-  if (receipt.blockNumber !== record.blockNumber) throw new Error("Deployment block number mismatch");
-
-  let ok = true;
-  const name: string = await token.name();
-  const symbol: string = await token.symbol();
-  const decimals: bigint = await token.decimals();
-  const totalSupply: bigint = await token.totalSupply();
-  const totalSupplyConstant: bigint = await token.TOTAL_SUPPLY();
-
-  if (name !== "apM Fashion") { console.error("FAIL name"); ok = false; }
-  if (symbol !== "APM") { console.error("FAIL symbol"); ok = false; }
-  if (Number(decimals) !== 18) { console.error("FAIL decimals"); ok = false; }
-  if (totalSupply !== BigInt(record.plan.totalSupplyWei)) { console.error("FAIL totalSupply"); ok = false; }
-  if (totalSupplyConstant !== BigInt(record.plan.totalSupplyWei)) {
-    console.error("FAIL TOTAL_SUPPLY");
-    ok = false;
-  }
-
-  const runtimeCode = await provider.getCode(address);
-  if (ethers.keccak256(runtimeCode) !== record.runtimeBytecodeHash) {
-    console.error("FAIL runtime bytecode hash");
-    ok = false;
-  }
-
-  try {
-    await token.owner();
-    console.error("FAIL ownerless: owner() did not revert");
-    ok = false;
-  } catch {
-    console.log("[ok] ownerless");
-  }
-
-  const transferInterface = new ethers.Interface(TOKEN_ABI);
-  const minted = new Map<string, bigint>();
-  for (const log of receipt.logs) {
-    if (log.address.toLowerCase() !== address.toLowerCase()) continue;
-    try {
-      const parsed = transferInterface.parseLog({ topics: [...log.topics], data: log.data });
-      if (parsed?.name !== "Transfer" || parsed.args[0] !== ethers.ZeroAddress) continue;
-      const recipient = (parsed.args[1] as string).toLowerCase();
-      minted.set(recipient, (minted.get(recipient) ?? 0n) + (parsed.args[2] as bigint));
-    } catch {
-      // Ignore non-Transfer logs from the token contract.
-    }
-  }
-
-  const expectedByRecipient = new Map<string, { recipient: string; amount: bigint; pools: string[] }>();
-  for (const allocation of record.plan.allocations) {
-    const key = allocation.recipient.toLowerCase();
-    const existing = expectedByRecipient.get(key);
-    if (existing) {
-      existing.amount += BigInt(allocation.amountWei);
-      existing.pools.push(allocation.name);
-    } else {
-      expectedByRecipient.set(key, {
-        recipient: allocation.recipient,
-        amount: BigInt(allocation.amountWei),
-        pools: [allocation.name],
-      });
-    }
-  }
-
-  for (const expectedRecipient of expectedByRecipient.values()) {
-    const actual = minted.get(expectedRecipient.recipient.toLowerCase()) ?? 0n;
-    const expected = expectedRecipient.amount;
-    const label = expectedRecipient.pools.join(" + ");
-    if (actual !== expected) {
-      console.error(`FAIL initial mint ${label}: ${actual} != ${expected}`);
-      ok = false;
-    } else {
-      const currentBalance: bigint = await token.balanceOf(expectedRecipient.recipient);
-      console.log(`[ok] ${label}: minted=${actual}, currentBalance=${currentBalance}`);
-    }
-  }
-
-  console.log(ok ? "ALL CHECKS PASSED" : "ONE OR MORE CHECKS FAILED");
-  if (!ok) process.exitCode = 1;
+  const transaction = await provider.getTransaction(record.transactionHash);
+  assert(receipt && transaction, "Deployment transaction not found");
+  assert.equal(receipt.status, 1, "Deployment reverted");
+  const address = getAddress(record.contractAddress);
+  const recipient = getAddress(record.recipient);
+  assert.equal(transaction.chainId, BigInt(chainId), "Transaction chain mismatch");
+  assert.equal(transaction.from, getAddress(record.deployer), "Deployer mismatch");
+  assert.equal(transaction.to, null, "Not a deployment transaction");
+  assert.equal(transaction.value, 0n, "Unexpected BNB value");
+  assert.equal(receipt.contractAddress, address, "Contract address mismatch");
+  assert.equal(getCreateAddress({ from: transaction.from, nonce: transaction.nonce }), address);
+  const factory = tokenFactory();
+  const supply = TOTAL_SUPPLY;
+  const expected = await factory.getDeployTransaction([recipient], [supply]);
+  assert.equal(transaction.data, expected.data, "Deployment bytecode or constructor arguments mismatch");
+  assert.notEqual(await provider.getCode(address), "0x", "Missing deployed code");
+  const token = new Contract(address, factory.interface, provider);
+  assert.equal(await token.name(), "apM Fashion");
+  assert.equal(await token.symbol(), "APM");
+  assert.equal(await token.decimals(), 18n);
+  assert.equal(await token.TOTAL_SUPPLY(), supply);
+  assert.equal(await token.totalSupply(), supply);
+  const mints = receipt.logs.filter((log) => log.address.toLowerCase() === address.toLowerCase())
+    .map((log) => factory.interface.parseLog({ topics: [...log.topics], data: log.data }))
+    .filter((log) => log?.name === "Transfer" && log.args[0] === ZeroAddress);
+  assert.equal(mints.length, 1, "Expected one initial mint");
+  assert.equal(mints[0]!.args[1], recipient, "Initial recipient mismatch");
+  assert.equal(mints[0]!.args[2], supply, "Initial mint amount mismatch");
+  console.log(`Verified ${address} at deployment block ${receipt.blockNumber}`);
+  console.log(`Recipient current balance: ${await token.balanceOf(recipient)}`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  (async () => {
+    if (!process.argv[2]) throw new Error("Usage: npm run verify:onchain -- <deployment-record.json>");
+    const record: DeploymentRecord = JSON.parse(readFileSync(process.argv[2], "utf8"));
+    const provider = await connectRpc(record.network);
+    try { await verifyDeployment(record, provider); }
+    finally { provider.destroy(); }
+  })().catch((error) => { console.error(error.message ?? error); process.exitCode = 1; });
+}

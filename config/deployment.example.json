@@ -1,0 +1,10 @@
+{
+  "bsc": {
+    "deployer": null,
+    "recipient": null
+  },
+  "bscTestnet": {
+    "deployer": null,
+    "recipient": null
+  }
+}
