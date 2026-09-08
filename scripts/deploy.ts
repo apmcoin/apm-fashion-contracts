@@ -22,11 +22,12 @@ async function main() {
     const gasPrice = (await provider.getFeeData()).gasPrice;
     if (gasPrice === null) throw new Error("Missing gas price");
     const gasLimit = (await provider.estimateGas({ ...creation, from: deployer })) * 120n / 100n;
-    if (await provider.getBalance(deployer) < gasLimit * gasPrice) throw new Error("Insufficient BNB for gas");
+    if (await provider.getBalance(deployer) < gasLimit * gasPrice) throw new Error("Insufficient native balance for gas");
     const transaction = Transaction.from({ type: 0, chainId, nonce, gasPrice, gasLimit, data: creation.data, value: 0n });
     const address = getCreateAddress({ from: deployer, nonce });
     console.log({ network, chainId, deployer, recipient, owners, threshold: String(threshold),
-      supply: formatEther(supply), address, maxGasBNB: formatEther(gasLimit * gasPrice), dataHash: keccak256(creation.data!) });
+      supply: formatEther(supply), address, gasToken: network === "sepolia" ? "ETH" : "BNB",
+      maxGasCost: formatEther(gasLimit * gasPrice), dataHash: keccak256(creation.data!) });
     const prompt = createInterface({ input: process.stdin, output: process.stdout });
     try {
       if (await prompt.question("Type DEPLOY to request Ledger signing: ") !== "DEPLOY") return;

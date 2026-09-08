@@ -25,7 +25,7 @@ export async function verifyDeployment(record: DeploymentRecord, provider: JsonR
   assert.equal(transaction.chainId, BigInt(chainId), "Transaction chain mismatch");
   assert.equal(transaction.from, getAddress(record.deployer), "Deployer mismatch");
   assert.equal(transaction.to, null, "Not a deployment transaction");
-  assert.equal(transaction.value, 0n, "Unexpected BNB value");
+  assert.equal(transaction.value, 0n, "Unexpected native value");
   assert.equal(receipt.contractAddress, address, "Contract address mismatch");
   assert.equal(getCreateAddress({ from: transaction.from, nonce: transaction.nonce }), address);
   const factory = tokenFactory();

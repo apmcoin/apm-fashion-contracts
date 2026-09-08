@@ -6,5 +6,9 @@
   "bscTestnet": {
     "deployer": null,
     "recipient": null
+  },
+  "sepolia": {
+    "deployer": null,
+    "recipient": null
   }
 }

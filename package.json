@@ -9,6 +9,7 @@
     "flatten": "hardhat flatten contracts/ApmFashion.sol > flattened/ApmFashion.sol",
     "build": "hardhat compile && npm run flatten",
     "deploy:bscTestnet": "ts-node scripts/deploy.ts bscTestnet",
+    "deploy:sepolia": "ts-node scripts/deploy.ts sepolia",
     "deploy:bsc": "ts-node scripts/deploy.ts bsc",
     "verify:onchain": "ts-node scripts/verify-onchain.ts"
   },

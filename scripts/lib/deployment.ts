@@ -5,14 +5,14 @@ import { ContractFactory, FetchRequest, getAddress, JsonRpcProvider, ZeroAddress
 
 export const ROOT = resolve(__dirname, "../..");
 export const TOTAL_SUPPLY = 10_000_000_000n * 10n ** 18n;
-const NETWORKS = { bsc: [56, "BSC_RPC"], bscTestnet: [97, "BSC_TESTNET_RPC"] } as const;
+const NETWORKS = { bsc: [56, "BSC_RPC"], bscTestnet: [97, "BSC_TESTNET_RPC"], sepolia: [11155111, "SEPOLIA_RPC"] } as const;
 export type Network = keyof typeof NETWORKS;
 type DeploymentConfig = Record<Network, { deployer: string | null; recipient: string | null }>;
 
 export function networkSettings(network: string) {
-  if (network !== "bsc" && network !== "bscTestnet") throw new Error("Use bsc or bscTestnet");
+  if (network !== "bsc" && network !== "bscTestnet" && network !== "sepolia") throw new Error("Use bsc, bscTestnet or sepolia");
   const [chainId, rpcVariable] = NETWORKS[network];
-  return { network, chainId, rpcVariable };
+  return { network, chainId, rpcVariable } as const;
 }
 
 export function deploymentSettings(network: string, config?: DeploymentConfig) {
