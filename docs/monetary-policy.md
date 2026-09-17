@@ -19,12 +19,12 @@ mechanism to increase or decrease `totalSupply` afterward.
 | Pool | Amount (APM) | Share |
 |---|---:|---:|
 | Rewards | 3,000,000,000 | 30.00% |
-| Foundation | 2,500,000,000 | 25.00% |
+| Foundation | 2,250,000,000 | 22.50% |
 | Genesis Allocation | 1,598,200,000 | 15.982% |
 | Ecosystem & Network Growth | 1,501,800,000 | 15.018% |
 | Exchange Allocation | 700,000,000 | 7.00% |
 | Investors | 500,000,000 | 5.00% |
-| Liquidity Supply | 200,000,000 | 2.00% |
+| Liquidity Supply | 450,000,000 | 4.50% |
 | **Total** | **10,000,000,000** | **100.00%** |
 
 Machine-readable allocation amounts are maintained in

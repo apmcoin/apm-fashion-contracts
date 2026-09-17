@@ -14,7 +14,7 @@
     {
       "id": "foundation",
       "name": "Foundation",
-      "amountTokens": "2500000000"
+      "amountTokens": "2250000000"
     },
     {
       "id": "rewards",
@@ -34,7 +34,7 @@
     {
       "id": "liquidity_supply",
       "name": "Liquidity Supply",
-      "amountTokens": "200000000"
+      "amountTokens": "450000000"
     }
   ]
 }
