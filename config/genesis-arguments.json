@@ -2,7 +2,6 @@
   "bsc": {
     "chainId": 56,
     "token": "0x72a22fAA6a522C81A8F5d508381e18af3dA0921E",
-    "merkleRoot": "0x43c76cc4b8f874c5688ede19a01dca8902d73a73216a7ac588441ecd6453d1a5",
     "startTimestamp": 1792224000,
     "roundEndTimestamps": [
       1794902400,
@@ -47,7 +46,6 @@
   "sepolia": {
     "chainId": 11155111,
     "token": "0xDbe00f6aC9f4C2f7f5F870c22eBF788691fC3E29",
-    "merkleRoot": "0x43c76cc4b8f874c5688ede19a01dca8902d73a73216a7ac588441ecd6453d1a5",
     "startTimestamp": null,
     "roundEndTimestamps": null,
     "totalAllocation": "1598200000000000000000000000"

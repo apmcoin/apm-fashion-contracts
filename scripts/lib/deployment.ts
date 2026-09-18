@@ -15,17 +15,24 @@ export function networkSettings(network: string) {
   return { network, chainId, rpcVariable } as const;
 }
 
-export function deploymentSettings(network: string, config?: DeploymentConfig) {
+export function deployerSettings(network: string, config?: DeploymentConfig) {
   const settings = networkSettings(network);
   const configured: DeploymentConfig = config ?? JSON.parse(readFileSync(resolve(ROOT, "config/deployment.json"), "utf8"));
   const entry = configured[settings.network];
-  if (!entry.deployer || !entry.recipient) throw new Error("Set deployer and recipient in config/deployment.json");
+  if (!entry?.deployer) throw new Error("Set deployer in config/deployment.json");
   const deployer = getAddress(entry.deployer);
-  const recipient = getAddress(entry.recipient);
-  if (deployer === ZeroAddress || recipient === ZeroAddress || deployer === recipient) {
+  if (deployer === ZeroAddress) throw new Error("Use a nonzero deployer");
+  return { ...settings, deployer, recipient: entry.recipient };
+}
+
+export function deploymentSettings(network: string, config?: DeploymentConfig) {
+  const settings = deployerSettings(network, config);
+  if (!settings.recipient) throw new Error("Set recipient in config/deployment.json");
+  const recipient = getAddress(settings.recipient);
+  if (recipient === ZeroAddress || settings.deployer === recipient) {
     throw new Error("Use a nonzero deployer and a separate Safe recipient");
   }
-  return { ...settings, deployer, recipient };
+  return { ...settings, recipient };
 }
 
 export async function connectRpc(network: string) {
@@ -44,7 +51,7 @@ export async function connectRpc(network: string) {
   }
 }
 
-export function tokenFactory() {
-  const artifact = JSON.parse(readFileSync(resolve(ROOT, "artifacts/contracts/ApmFashion.sol/ApmFashion.json"), "utf8"));
+export function contractFactory(name: "ApmFashion" | "GenesisClaim") {
+  const artifact = JSON.parse(readFileSync(resolve(ROOT, `artifacts/contracts/${name}.sol/${name}.json`), "utf8"));
   return new ContractFactory(artifact.abi, artifact.bytecode);
 }

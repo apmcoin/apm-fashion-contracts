@@ -9,6 +9,8 @@
     "build": "hardhat compile",
     "deploy:sepolia": "ts-node scripts/deploy.ts sepolia",
     "deploy:bsc": "ts-node scripts/deploy.ts bsc",
+    "deploy:genesis:sepolia": "ts-node scripts/deploy.ts sepolia GenesisClaim",
+    "deploy:genesis:bsc": "ts-node scripts/deploy.ts bsc GenesisClaim",
     "verify:onchain": "ts-node scripts/verify-onchain.ts"
   },
   "devDependencies": {

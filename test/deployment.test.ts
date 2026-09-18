@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Transaction, Wallet, ZeroAddress } from "ethers";
-import { deploymentSettings, networkSettings, TOTAL_SUPPLY } from "../scripts/lib/deployment";
+import { deployerSettings, deploymentSettings, networkSettings, TOTAL_SUPPLY } from "../scripts/lib/deployment";
 import { attachSignature } from "../scripts/lib/ledger";
 
 const DEPLOYER = "0x0000000000000000000000000000000000000001";
@@ -18,13 +18,21 @@ describe("deployment", () => {
     expect(deploymentSettings("sepolia", config())).to.include({ chainId: 11155111, deployer: DEPLOYER, recipient: RECIPIENT });
     expect(networkSettings("sepolia").rpcVariable).to.equal("SEPOLIA_RPC");
     expect(() => deploymentSettings("bsc", { ...config(), bsc: { deployer: null, recipient: null } }))
-      .to.throw("Set deployer and recipient");
+      .to.throw("Set deployer");
     expect(() => deploymentSettings("ethereum", config())).to.throw("Use bsc or sepolia");
     for (const recipient of [ZeroAddress, DEPLOYER, "not-an-address"]) {
       const invalid = config();
       invalid.bsc.recipient = recipient;
       expect(() => deploymentSettings("bsc", invalid)).to.throw();
     }
+  });
+
+  it("allows a Genesis deployer without a token recipient but keeps token deployment checks", () => {
+    const settings = { ...config(), bsc: { deployer: DEPLOYER, recipient: null } };
+    expect(deployerSettings("bsc", settings).deployer).to.equal(DEPLOYER);
+    expect(() => deploymentSettings("bsc", settings)).to.throw("Set recipient");
+    expect(() => deployerSettings("bsc", { ...settings, bsc: { deployer: ZeroAddress, recipient: null } }))
+      .to.throw("Use a nonzero deployer");
   });
 
   it("mints the complete supply to one recipient without changing the token contract", async () => {

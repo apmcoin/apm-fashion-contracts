@@ -26,6 +26,13 @@ npm run deploy:bsc
 npm run verify:onchain -- deployments/<chainId>/<tokenAddress>.json
 ```
 
+GenesisClaim reads its Merkle root from `config/genesis-merkle-tree.json` and its network settings from `config/genesis-arguments.json`.
+
+```bash
+npm run deploy:genesis:sepolia
+npm run deploy:genesis:bsc
+```
+
 ## References
 
 - [Monetary Policy](docs/monetary-policy.md)

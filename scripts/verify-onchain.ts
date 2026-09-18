@@ -1,16 +1,21 @@
 import { readFileSync } from "node:fs";
 import { strict as assert } from "node:assert";
 import { Contract, getAddress, getCreateAddress, JsonRpcProvider, ZeroAddress } from "ethers";
-import { connectRpc, Network, networkSettings, tokenFactory, TOTAL_SUPPLY } from "./lib/deployment";
+import { connectRpc, contractFactory, Network, networkSettings, TOTAL_SUPPLY } from "./lib/deployment";
+import type { GenesisArguments } from "./lib/genesis";
 
-export interface DeploymentRecord {
+interface DeploymentIdentity {
   network: Network;
   chainId: number;
   deployer: string;
-  recipient: string;
   contractAddress: string;
   transactionHash: string;
 }
+
+export type DeploymentRecord = DeploymentIdentity & (
+  { contract?: "ApmFashion"; recipient: string } |
+  { contract: "GenesisClaim"; constructorArguments: GenesisArguments }
+);
 
 export async function verifyDeployment(record: DeploymentRecord, provider: JsonRpcProvider) {
   const { chainId } = networkSettings(record.network);
@@ -21,19 +26,34 @@ export async function verifyDeployment(record: DeploymentRecord, provider: JsonR
   assert(receipt && transaction, "Deployment transaction not found");
   assert.equal(receipt.status, 1, "Deployment reverted");
   const address = getAddress(record.contractAddress);
-  const recipient = getAddress(record.recipient);
   assert.equal(transaction.chainId, BigInt(chainId), "Transaction chain mismatch");
   assert.equal(transaction.from, getAddress(record.deployer), "Deployer mismatch");
   assert.equal(transaction.to, null, "Not a deployment transaction");
   assert.equal(transaction.value, 0n, "Unexpected native value");
   assert.equal(receipt.contractAddress, address, "Contract address mismatch");
   assert.equal(getCreateAddress({ from: transaction.from, nonce: transaction.nonce }), address);
-  const factory = tokenFactory();
+  const factory = contractFactory(record.contract ?? "ApmFashion");
   const supply = TOTAL_SUPPLY;
-  const expected = await factory.getDeployTransaction([recipient], [supply]);
+  const expected = record.contract === "GenesisClaim"
+    ? await factory.getDeployTransaction(...record.constructorArguments)
+    : await factory.getDeployTransaction([getAddress(record.recipient)], [supply]);
   assert.equal(transaction.data, expected.data, "Deployment bytecode or constructor arguments mismatch");
   assert.notEqual(await provider.getCode(address), "0x", "Missing deployed code");
   const token = new Contract(address, factory.interface, provider);
+  if (record.contract === "GenesisClaim") {
+    const [asset, root, start, ends, allocation] = record.constructorArguments;
+    assert.equal(await token.token(), getAddress(asset));
+    assert.equal(await token.merkleRoot(), root);
+    assert.equal(await token.startTimestamp(), BigInt(start));
+    assert.equal(await token.totalAllocation(), BigInt(allocation));
+    assert.equal(ends.length, 36);
+    for (let round = 0; round < ends.length; ++round) {
+      assert.equal(await token.roundEndTimestamps(round), BigInt(ends[round]));
+    }
+    console.log(`Verified GenesisClaim ${address} at deployment block ${receipt.blockNumber}`);
+    return;
+  }
+  const recipient = getAddress(record.recipient);
   assert.equal(await token.name(), "apM Fashion");
   assert.equal(await token.symbol(), "APM");
   assert.equal(await token.decimals(), 18n);
