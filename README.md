@@ -17,11 +17,10 @@ npm run build
 
 Local settings:
 
-- `config/deployment.json`: [deployment template](config/deployment.example.json)
-- `.env`: [environment template](.env.example)
+- `config/deployment.json`: `deployer` and `recipient` for `bsc` and `sepolia`.
+- `.env`: `BSC_RPC`, `SEPOLIA_RPC`, and `LEDGER_PATH`.
 
 ```bash
-npm run deploy:bscTestnet
 npm run deploy:sepolia
 npm run deploy:bsc
 npm run verify:onchain -- deployments/<chainId>/<tokenAddress>.json
