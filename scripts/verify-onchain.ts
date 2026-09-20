@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { strict as assert } from "node:assert";
 import { Contract, getAddress, getCreateAddress, JsonRpcProvider, ZeroAddress } from "ethers";
-import { connectRpc, contractFactory, Network, networkSettings, TOTAL_SUPPLY } from "./lib/deployment";
+import { connectRpc, contractFactory, Network, networkSettings } from "./lib/deployment";
 import type { GenesisArguments } from "./lib/genesis";
 
 interface DeploymentIdentity {
@@ -33,7 +33,7 @@ export async function verifyDeployment(record: DeploymentRecord, provider: JsonR
   assert.equal(receipt.contractAddress, address, "Contract address mismatch");
   assert.equal(getCreateAddress({ from: transaction.from, nonce: transaction.nonce }), address);
   const factory = contractFactory(record.contract ?? "ApmFashion");
-  const supply = TOTAL_SUPPLY;
+  const supply = 10_000_000_000n * 10n ** 18n;
   const expected = record.contract === "GenesisClaim"
     ? await factory.getDeployTransaction(...record.constructorArguments)
     : await factory.getDeployTransaction([getAddress(record.recipient)], [supply]);

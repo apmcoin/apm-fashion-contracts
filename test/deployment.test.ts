@@ -1,45 +1,49 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { expect } from "chai";
-import { ethers } from "hardhat";
 import { Transaction, Wallet, ZeroAddress } from "ethers";
-import { deployerSettings, deploymentSettings, networkSettings, TOTAL_SUPPLY } from "../scripts/lib/deployment";
+import genesisConfig from "../config/genesis-arguments.json";
+import { deployerSettings, networkSettings } from "../scripts/lib/deployment";
+import { genesisArguments } from "../scripts/lib/genesis";
 import { attachSignature } from "../scripts/lib/ledger";
 
 const DEPLOYER = "0x0000000000000000000000000000000000000001";
-const RECIPIENT = "0x0000000000000000000000000000000000000002";
 const config = () => ({
-  bsc: { deployer: DEPLOYER, recipient: RECIPIENT },
-  sepolia: { deployer: DEPLOYER, recipient: RECIPIENT },
+  bsc: { deployer: DEPLOYER },
+  sepolia: { deployer: DEPLOYER },
 });
 
 describe("deployment", () => {
-  it("requires configured, distinct nonzero addresses and a supported network", () => {
-    expect(deploymentSettings("bsc", config())).to.include({ chainId: 56, deployer: DEPLOYER, recipient: RECIPIENT });
-    expect(networkSettings("bsc").rpcVariable).to.equal("BSC_RPC");
-    expect(deploymentSettings("sepolia", config())).to.include({ chainId: 11155111, deployer: DEPLOYER, recipient: RECIPIENT });
-    expect(networkSettings("sepolia").rpcVariable).to.equal("SEPOLIA_RPC");
-    expect(() => deploymentSettings("bsc", { ...config(), bsc: { deployer: null, recipient: null } }))
-      .to.throw("Set deployer");
-    expect(() => deploymentSettings("ethereum", config())).to.throw("Use bsc or sepolia");
-    for (const recipient of [ZeroAddress, DEPLOYER, "not-an-address"]) {
-      const invalid = config();
-      invalid.bsc.recipient = recipient;
-      expect(() => deploymentSettings("bsc", invalid)).to.throw();
+  it("uses the fixed Genesis root on both networks and matches the archived tree", () => {
+    const root = "0x43c76cc4b8f874c5688ede19a01dca8902d73a73216a7ac588441ecd6453d1a5";
+    const archive = JSON.parse(readFileSync(resolve(__dirname, "../config/genesis-merkle-tree.json"), "utf8"));
+    expect(archive.tree[0]).to.equal(root);
+    const configured = {
+      ...genesisConfig,
+      sepolia: { ...genesisConfig.bsc, chainId: 11155111, token: genesisConfig.sepolia.token },
+    };
+    for (const network of ["bsc", "sepolia"] as const) {
+      const entry = configured[network];
+      expect(genesisArguments(network, configured)).to.deep.equal([
+        entry.token, root, entry.startTimestamp, entry.roundEndTimestamps, entry.totalAllocation,
+      ]);
     }
+    expect(() => genesisArguments("sepolia", genesisConfig)).to.throw("Set the Genesis start timestamp");
   });
 
-  it("allows a Genesis deployer without a token recipient but keeps token deployment checks", () => {
-    const settings = { ...config(), bsc: { deployer: DEPLOYER, recipient: null } };
-    expect(deployerSettings("bsc", settings).deployer).to.equal(DEPLOYER);
-    expect(() => deploymentSettings("bsc", settings)).to.throw("Set recipient");
-    expect(() => deployerSettings("bsc", { ...settings, bsc: { deployer: ZeroAddress, recipient: null } }))
-      .to.throw("Use a nonzero deployer");
-  });
-
-  it("mints the complete supply to one recipient without changing the token contract", async () => {
-    const [, recipient] = await ethers.getSigners();
-    const token = await (await ethers.getContractFactory("ApmFashion")).deploy([recipient.address], [TOTAL_SUPPLY]);
-    expect(await token.totalSupply()).to.equal(TOTAL_SUPPLY);
-    expect(await token.balanceOf(recipient.address)).to.equal(TOTAL_SUPPLY);
+  it("requires a configured nonzero deployer and a supported network", () => {
+    expect(deployerSettings("bsc", config())).to.deep.equal({ network: "bsc", chainId: 56, rpcVariable: "BSC_RPC", deployer: DEPLOYER });
+    expect(networkSettings("bsc").rpcVariable).to.equal("BSC_RPC");
+    expect(deployerSettings("sepolia", config())).to.include({ chainId: 11155111, deployer: DEPLOYER });
+    expect(networkSettings("sepolia").rpcVariable).to.equal("SEPOLIA_RPC");
+    expect(() => deployerSettings("bsc", { ...config(), bsc: { deployer: null } }))
+      .to.throw("Set deployer");
+    expect(() => deployerSettings("ethereum", config())).to.throw("Use bsc or sepolia");
+    for (const deployer of [ZeroAddress, "not-an-address"]) {
+      const invalid = config();
+      invalid.bsc.deployer = deployer;
+      expect(() => deployerSettings("bsc", invalid)).to.throw();
+    }
   });
 
   it("attaches Ledger-format signatures without changing the transaction and rejects a wrong signer", async () => {

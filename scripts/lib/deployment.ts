@@ -4,10 +4,9 @@ import { resolve } from "node:path";
 import { ContractFactory, FetchRequest, getAddress, JsonRpcProvider, ZeroAddress } from "ethers";
 
 export const ROOT = resolve(__dirname, "../..");
-export const TOTAL_SUPPLY = 10_000_000_000n * 10n ** 18n;
 const NETWORKS = { bsc: [56, "BSC_RPC"], sepolia: [11155111, "SEPOLIA_RPC"] } as const;
 export type Network = keyof typeof NETWORKS;
-type DeploymentConfig = Record<Network, { deployer: string | null; recipient: string | null }>;
+type DeploymentConfig = Record<Network, { deployer: string | null }>;
 
 export function networkSettings(network: string) {
   if (network !== "bsc" && network !== "sepolia") throw new Error("Use bsc or sepolia");
@@ -22,17 +21,7 @@ export function deployerSettings(network: string, config?: DeploymentConfig) {
   if (!entry?.deployer) throw new Error("Set deployer in config/deployment.json");
   const deployer = getAddress(entry.deployer);
   if (deployer === ZeroAddress) throw new Error("Use a nonzero deployer");
-  return { ...settings, deployer, recipient: entry.recipient };
-}
-
-export function deploymentSettings(network: string, config?: DeploymentConfig) {
-  const settings = deployerSettings(network, config);
-  if (!settings.recipient) throw new Error("Set recipient in config/deployment.json");
-  const recipient = getAddress(settings.recipient);
-  if (recipient === ZeroAddress || settings.deployer === recipient) {
-    throw new Error("Use a nonzero deployer and a separate Safe recipient");
-  }
-  return { ...settings, recipient };
+  return { ...settings, deployer };
 }
 
 export async function connectRpc(network: string) {

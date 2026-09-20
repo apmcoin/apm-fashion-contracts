@@ -1,16 +1,14 @@
 {
   "name": "apm-fashion-contracts",
   "version": "1.0.0",
-  "description": "apM Fashion ownerless fixed-supply token deployment repository.",
+  "description": "Solidity contracts for apM Fashion.",
   "license": "MIT",
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
     "build": "hardhat compile",
-    "deploy:sepolia": "ts-node scripts/deploy.ts sepolia",
-    "deploy:bsc": "ts-node scripts/deploy.ts bsc",
-    "deploy:genesis:sepolia": "ts-node scripts/deploy.ts sepolia GenesisClaim",
-    "deploy:genesis:bsc": "ts-node scripts/deploy.ts bsc GenesisClaim",
+    "deploy:genesis:sepolia": "ts-node scripts/deploy-genesis.ts sepolia",
+    "deploy:genesis:bsc": "ts-node scripts/deploy-genesis.ts bsc",
     "verify:onchain": "ts-node scripts/verify-onchain.ts"
   },
   "devDependencies": {

@@ -11,6 +11,13 @@ async function deployToken(recipients: string[], amounts: bigint[]) {
 }
 
 describe("ApmFashion", () => {
+  it("mints the complete supply to one recipient", async () => {
+    const [, recipient] = await ethers.getSigners();
+    const token = await deployToken([recipient.address], [TOTAL]);
+    expect(await token.totalSupply()).to.equal(TOTAL);
+    expect(await token.balanceOf(recipient.address)).to.equal(TOTAL);
+  });
+
   it("mints exactly TOTAL_SUPPLY and exposes correct metadata", async () => {
     const [a, b] = await ethers.getSigners();
     const token = await deployToken([a.address, b.address], [TOTAL / 2n, TOTAL / 2n]);
