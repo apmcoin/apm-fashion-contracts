@@ -29,6 +29,15 @@ export function genesisArguments(
     "Set the Genesis start timestamp");
   assert(entry.roundEndTimestamps?.length === 36 && entry.roundEndTimestamps.every(Number.isSafeInteger),
     "Set all 36 Genesis round end timestamps");
+  let previous = entry.startTimestamp;
+  for (const end of entry.roundEndTimestamps) {
+    assert(end > previous, "Genesis round ends must increase after the start timestamp");
+    if (settings.network === "bsc") {
+      const interval = end - previous;
+      assert(interval >= 28 * 86400 && interval <= 31 * 86400, "BSC Genesis rounds must span 28 to 31 days");
+    }
+    previous = end;
+  }
 
   const allocation = tokenomics.pools.find((pool) => pool.id === "genesis_allocation");
   assert(allocation, "Missing Genesis allocation");

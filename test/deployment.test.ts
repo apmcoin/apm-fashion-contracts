@@ -18,17 +18,47 @@ describe("deployment", () => {
     const root = "0x43c76cc4b8f874c5688ede19a01dca8902d73a73216a7ac588441ecd6453d1a5";
     const archive = JSON.parse(readFileSync(resolve(__dirname, "../config/genesis-merkle-tree.json"), "utf8"));
     expect(archive.tree[0]).to.equal(root);
-    const configured = {
-      ...genesisConfig,
-      sepolia: { ...genesisConfig.bsc, chainId: 11155111, token: genesisConfig.sepolia.token },
-    };
     for (const network of ["bsc", "sepolia"] as const) {
-      const entry = configured[network];
-      expect(genesisArguments(network, configured)).to.deep.equal([
+      const entry = genesisConfig[network];
+      expect(genesisArguments(network, genesisConfig)).to.deep.equal([
         entry.token, root, entry.startTimestamp, entry.roundEndTimestamps, entry.totalAllocation,
       ]);
     }
-    expect(() => genesisArguments("sepolia", genesisConfig)).to.throw("Set the Genesis start timestamp");
+    const unconfigured = { ...genesisConfig, sepolia: { ...genesisConfig.sepolia, startTimestamp: null } };
+    expect(() => genesisArguments("sepolia", unconfigured)).to.throw("Set the Genesis start timestamp");
+  });
+
+  it("allows five-minute Sepolia rounds while retaining BSC interval checks", () => {
+    const configured = structuredClone(genesisConfig);
+    for (const network of ["bsc", "sepolia"] as const) {
+      const entry = configured[network];
+      entry.roundEndTimestamps = Array.from({ length: 36 }, (_, round) => entry.startTimestamp + (round + 1) * 300);
+    }
+    expect(genesisArguments("sepolia", configured)[3]).to.deep.equal(configured.sepolia.roundEndTimestamps);
+    expect(() => genesisArguments("bsc", configured)).to.throw("BSC Genesis rounds must span 28 to 31 days");
+
+    for (const round of [0, 1, 35]) {
+      for (const interval of [28 * 86400 - 1, 31 * 86400 + 1]) {
+        const invalid = structuredClone(genesisConfig);
+        const entry = invalid.bsc;
+        entry.roundEndTimestamps[round] = (round === 0 ? entry.startTimestamp : entry.roundEndTimestamps[round - 1]) + interval;
+        expect(() => genesisArguments("bsc", invalid)).to.throw("BSC Genesis rounds must span 28 to 31 days");
+      }
+    }
+    let end = configured.bsc.startTimestamp;
+    configured.bsc.roundEndTimestamps = Array.from({ length: 36 }, (_, round) => end += [28, 29, 30, 31][round % 4] * 86400);
+    expect(() => genesisArguments("bsc", configured)).not.to.throw();
+  });
+
+  it("rejects non-increasing round ends on both networks", () => {
+    for (const network of ["bsc", "sepolia"] as const) {
+      for (const round of [0, 1, 35]) {
+        const configured = structuredClone(genesisConfig);
+        const entry = configured[network];
+        entry.roundEndTimestamps[round] = round === 0 ? entry.startTimestamp : entry.roundEndTimestamps[round - 1];
+        expect(() => genesisArguments(network, configured)).to.throw("Genesis round ends must increase after the start timestamp");
+      }
+    }
   });
 
   it("requires a configured nonzero deployer and a supported network", () => {

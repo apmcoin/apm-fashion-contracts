@@ -11,8 +11,6 @@ contract GenesisClaim is ReentrancyGuard {
 
     uint256 public constant ROUND_COUNT = 36;
     uint256 public constant CONVERSION_RATIO = 2;
-    uint256 public constant MIN_ROUND_INTERVAL = 28 days;
-    uint256 public constant MAX_ROUND_INTERVAL = 31 days;
     address public constant DEAD_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
     IERC20 public immutable token;
@@ -50,16 +48,9 @@ contract GenesisClaim is ReentrancyGuard {
         if (merkleRoot_ == bytes32(0)) revert ZeroMerkleRoot();
         if (totalAllocation_ == 0) revert ZeroAllocation();
 
-        require(startTimestamp_ >= block.timestamp, "start in past");
         require(roundEndTimestamps_[0] > startTimestamp_, "invalid first round end");
-        uint256 firstInterval = roundEndTimestamps_[0] - startTimestamp_;
-        require(firstInterval >= MIN_ROUND_INTERVAL, "first interval too short");
-        require(firstInterval <= MAX_ROUND_INTERVAL, "first interval too long");
         for (uint256 i = 1; i < ROUND_COUNT; ++i) {
             require(roundEndTimestamps_[i] > roundEndTimestamps_[i - 1], "round ends not increasing");
-            uint256 interval = roundEndTimestamps_[i] - roundEndTimestamps_[i - 1];
-            require(interval >= MIN_ROUND_INTERVAL, "round interval too short");
-            require(interval <= MAX_ROUND_INTERVAL, "round interval too long");
         }
 
         token = token_;
