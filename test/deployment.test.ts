@@ -2,12 +2,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect } from "chai";
 import { Transaction, Wallet, ZeroAddress } from "ethers";
-import genesisConfig from "../config/genesis-arguments.json";
+import productionConfig from "../config/genesis-arguments.json";
+import stageConfig from "../config/genesis-arguments.stage.json";
 import { deployerSettings, networkSettings } from "../scripts/lib/deployment";
 import { genesisArguments } from "../scripts/lib/genesis";
 import { attachSignature } from "../scripts/lib/ledger";
 
 const DEPLOYER = "0x0000000000000000000000000000000000000001";
+const genesisConfig = { bsc: productionConfig.bsc, sepolia: stageConfig.sepolia };
 const config = () => ({
   bsc: { deployer: DEPLOYER },
   sepolia: { deployer: DEPLOYER },
@@ -20,12 +22,13 @@ describe("deployment", () => {
     expect(archive.tree[0]).to.equal(root);
     for (const network of ["bsc", "sepolia"] as const) {
       const entry = genesisConfig[network];
-      expect(genesisArguments(network, genesisConfig)).to.deep.equal([
+      expect(genesisArguments(network)).to.deep.equal([
         entry.token, root, entry.startTimestamp, entry.roundEndTimestamps, entry.totalAllocation,
       ]);
     }
     const unconfigured = { ...genesisConfig, sepolia: { ...genesisConfig.sepolia, startTimestamp: null } };
     expect(() => genesisArguments("sepolia", unconfigured)).to.throw("Set the Genesis start timestamp");
+    expect(() => genesisArguments("bsc", stageConfig)).to.throw("Genesis chain mismatch");
   });
 
   it("allows five-minute Sepolia rounds while retaining BSC interval checks", () => {

@@ -62,8 +62,9 @@ describe("GenesisClaim", () => {
     expect(await claim.merkleRoot()).to.equal(tree.root);
     expect(await claim.CONVERSION_RATIO()).to.equal(2n);
     expect(await claim.ROUND_COUNT()).to.equal(36n);
+    const publicInterface = new ethers.Interface(claim.interface.fragments);
     for (const name of ["owner", "withdraw", "leafHash", "roundAmount", "roundAllocations"]) {
-      expect(claim.interface.getFunction(name)).to.equal(null);
+      expect(publicInterface.getFunction(name)).to.equal(null);
     }
 
     await time.setNextBlockTimestamp(start);
@@ -165,6 +166,153 @@ describe("GenesisClaim", () => {
     await claim.settleExpiredRounds();
     expect(await token.balanceOf(DEAD_ADDRESS)).to.equal(allocation - paid);
     expect(await token.balanceOf(await claim.getAddress())).to.equal(0n);
+  });
+
+  for (const claims of ["all", "some", "none"] as const) {
+    it(`isolates unsolicited APM deposits over 36 short rounds when ${claims} holders claim`, async () => {
+      const { token, claim, holders, start, roundEnds, allocation, tree } = await deployWithBalances(
+        [1800n, 53n, 37n], { roundInterval: 300n }
+      );
+      const donor = (await ethers.getSigners())[19];
+      const address = await claim.getAddress();
+      await token.transfer(donor.address, TOKEN_TOTAL / 2n);
+      const donate = async (amount: bigint) => token.connect(donor).transfer(address, amount);
+      let donated = 1n;
+      let paid = 0n;
+      let settledBudget = 0n;
+      let settledClaims = 0n;
+      const received = holders.map(() => 0n);
+      await donate(donated);
+
+      for (let round = 0; round < ROUND_COUNT; round++) {
+        const beforeClaims = round % 2 === 0 ? 1n : 1_000_000n * E18;
+        const afterClaims = BigInt(round + 1);
+        await time.setNextBlockTimestamp(round === 0 ? start : roundEnds[round - 1]);
+        await donate(beforeClaims);
+        donated += beforeClaims;
+        expect(await claim.currentRound()).to.equal(BigInt(round));
+        if (round % 2 === 0) await claim.connect(donor).settleExpiredRounds();
+
+        let roundPaid = 0n;
+        for (const [index, holder] of holders.entries()) {
+          if (claims === "none" || (claims === "some" && (round + index) % 3 !== 0)) continue;
+          await expect(claim.connect(holder.signer).claim(holder.balance, holder.proof))
+            .to.emit(claim, "Claimed").withArgs(BigInt(round), holder.signer.address, holder.monthly);
+          roundPaid += holder.monthly;
+          received[index] += holder.monthly;
+        }
+        paid += roundPaid;
+        await donate(afterClaims);
+        donated += afterClaims;
+        await claim.connect(donor).settleExpiredRounds();
+        expect(await claim.roundClaimed(round)).to.equal(roundPaid);
+        expect(await claim.nextRoundToSettle()).to.equal(BigInt(round));
+        expect(await token.balanceOf(DEAD_ADDRESS)).to.equal(settledBudget - settledClaims);
+        expect((await token.balanceOf(address)) + (await token.balanceOf(DEAD_ADDRESS)) + paid)
+          .to.equal(allocation + donated);
+        expect(await claim.totalAllocation()).to.equal(allocation);
+        expect(await claim.merkleRoot()).to.equal(tree.root);
+        settledBudget += round === 35 ? allocation - allocation / 36n * 35n : allocation / 36n;
+        settledClaims += roundPaid;
+      }
+
+      await time.increaseTo(roundEnds[35]);
+      await claim.connect(donor).settleExpiredRounds();
+      expect(await token.balanceOf(DEAD_ADDRESS)).to.equal(allocation - paid);
+      expect(await token.balanceOf(address)).to.equal(donated);
+      expect(await claim.nextRoundToSettle()).to.equal(36n);
+      for (const [index, holder] of holders.entries()) {
+        expect(await token.balanceOf(holder.signer.address)).to.equal(received[index]);
+      }
+      await expect(claim.connect(donor).settleExpiredRounds()).not.to.emit(token, "Transfer");
+      expect(await token.balanceOf(address)).to.equal(donated);
+    });
+  }
+
+  it("does not grant a donor claim rights or reset a claimed flag or the round limit", async () => {
+    const { token, claim, holders, start, roundEnds } = await deployWithBalances(
+      [1800n, 3600n], { allocation: 3600n }
+    );
+    const donor = (await ethers.getSigners())[19];
+    const address = await claim.getAddress();
+    const holder = holders[0];
+    await token.transfer(donor.address, E18);
+    await time.increaseTo(start);
+    await token.connect(donor).transfer(address, E18 - 1n);
+    await expect(claim.connect(donor).claim(holder.balance, holder.proof))
+      .to.be.revertedWithCustomError(claim, "InvalidProof");
+    await claim.connect(holder.signer).claim(holder.balance, holder.proof);
+    await token.connect(donor).transfer(address, 1n);
+    await expect(claim.connect(holder.signer).claim(holder.balance, holder.proof))
+      .to.be.revertedWithCustomError(claim, "AlreadyClaimed");
+    await expect(claim.connect(holders[1].signer).claim(holders[1].balance, holders[1].proof))
+      .to.be.revertedWithCustomError(claim, "RoundAllocationExceeded").withArgs(0n, 300n, 100n);
+    expect(await claim.roundClaimed(0n)).to.equal(100n);
+    expect(await claim.isClaimed(0n, donor.address)).to.equal(false);
+    expect(await claim.isClaimed(0n, holders[1].signer.address)).to.equal(false);
+    await time.increaseTo(roundEnds[35]);
+    await claim.settleExpiredRounds();
+    expect(await token.balanceOf(address)).to.equal(E18);
+  });
+
+  it("counts a third-party transfer as ordinary funding without creating extra entitlement", async () => {
+    const { token, claim, holders, start, roundEnds, allocation } = await loadFixture(unfundedFixture);
+    const donor = (await ethers.getSigners())[19];
+    const address = await claim.getAddress();
+    const holder = holders[0];
+    await token.transfer(donor.address, holder.monthly);
+    await token.connect(donor).transfer(address, holder.monthly);
+    await token.transfer(address, allocation - holder.monthly);
+    await time.increaseTo(start);
+    await claim.connect(holder.signer).claim(holder.balance, holder.proof);
+    await time.increaseTo(roundEnds[35]);
+    await claim.connect(donor).settleExpiredRounds();
+    expect(await token.balanceOf(holder.signer.address)).to.equal(holder.monthly);
+    expect(await token.balanceOf(DEAD_ADDRESS)).to.equal(allocation - holder.monthly);
+    expect(await token.balanceOf(address)).to.equal(0n);
+    expect(await token.balanceOf(donor.address)).to.equal(0n);
+  });
+
+  it("leaves APM sent after final expiry or final settlement locked without reopening claims", async () => {
+    const { token, claim, holders, roundEnds, allocation } = await loadFixture(deployFixture);
+    const donor = (await ethers.getSigners())[19];
+    const address = await claim.getAddress();
+    const extra = 1_000_000n * E18;
+    await token.transfer(donor.address, extra + 1n);
+    await time.increaseTo(roundEnds[35]);
+    await token.connect(donor).transfer(address, 1n);
+    expect(await claim.settleExpiredRounds.staticCall()).to.deep.equal([36n, allocation]);
+    await claim.settleExpiredRounds();
+    expect(await token.balanceOf(address)).to.equal(1n);
+    await token.connect(donor).transfer(address, extra);
+    expect(await claim.settleExpiredRounds.staticCall()).to.deep.equal([0n, 0n]);
+    await expect(claim.connect(donor).settleExpiredRounds()).not.to.emit(token, "Transfer");
+    await expect(claim.connect(holders[0].signer).claim(holders[0].balance, holders[0].proof))
+      .to.be.revertedWithCustomError(claim, "ClaimWindowClosed");
+    expect(await token.balanceOf(DEAD_ADDRESS)).to.equal(allocation);
+    expect(await token.balanceOf(address)).to.equal(extra + 1n);
+  });
+
+  it("ignores another ERC20 balance and rejects a direct native-currency transfer", async () => {
+    const { token, claim, holders, start, roundEnds, allocation } = await loadFixture(deployFixture);
+    const donor = (await ethers.getSigners())[19];
+    const address = await claim.getAddress();
+    const otherToken = await (await ethers.getContractFactory("ApmFashion"))
+      .deploy([donor.address], [TOKEN_TOTAL]);
+    await otherToken.waitForDeployment();
+    await otherToken.connect(donor).transfer(address, TOKEN_TOTAL);
+    await expect(donor.sendTransaction({ to: address, value: 1n })).to.be.reverted;
+    expect(await claim.token()).to.equal(await token.getAddress());
+    await time.increaseTo(start);
+    const holder = holders[0];
+    await claim.connect(holder.signer).claim(holder.balance, holder.proof);
+    await time.increaseTo(roundEnds[35]);
+    await claim.connect(donor).settleExpiredRounds();
+    expect(await token.balanceOf(holder.signer.address)).to.equal(holder.monthly);
+    expect(await token.balanceOf(DEAD_ADDRESS)).to.equal(allocation - holder.monthly);
+    expect(await token.balanceOf(address)).to.equal(0n);
+    expect(await otherToken.balanceOf(address)).to.equal(TOKEN_TOTAL);
+    expect(await otherToken.balanceOf(DEAD_ADDRESS)).to.equal(0n);
   });
 
   it("does not carry a missed round into the next claim", async () => {
@@ -316,6 +464,37 @@ describe("GenesisClaim", () => {
       .to.emit(claim, "Claimed").withArgs(2n, holder.signer.address, holder.monthly);
     expect(await claim.isClaimed(0n, holder.signer.address)).to.equal(false);
     expect(await claim.isClaimed(1n, holder.signer.address)).to.equal(false);
+  });
+
+  it("supports one-second rounds without imposing a minimum duration", async () => {
+    const { token, claim, holders, start, roundEnds } = await deployWithBalances([1800n], { roundInterval: 1n });
+    const holder = holders[0];
+    for (let round = 0; round < ROUND_COUNT; round++) {
+      await time.setNextBlockTimestamp(start + BigInt(round));
+      await expect(claim.connect(holder.signer).claim(holder.balance, holder.proof))
+        .to.emit(claim, "Claimed").withArgs(BigInt(round), holder.signer.address, holder.monthly);
+    }
+    await time.increaseTo(roundEnds[35]);
+    await claim.settleExpiredRounds();
+    expect(await token.balanceOf(holder.signer.address)).to.equal(holder.monthly * 36n);
+    expect(await token.balanceOf(await claim.getAddress())).to.equal(0n);
+    expect(await claim.nextRoundToSettle()).to.equal(36n);
+  });
+
+  it("allows a fully expired schedule but only permits settlement, not claims", async () => {
+    const { token, tree, holders, start, roundEnds, allocation } = await loadFixture(deployFixture);
+    await time.increaseTo(roundEnds[35]);
+    const claim = await (await ethers.getContractFactory("GenesisClaim"))
+      .deploy(await token.getAddress(), tree.root, start, roundEnds, allocation);
+    await claim.waitForDeployment();
+    await token.transfer(await claim.getAddress(), allocation);
+    await expect(claim.currentRound()).to.be.revertedWithCustomError(claim, "ClaimWindowClosed");
+    await expect(claim.connect(holders[0].signer).claim(holders[0].balance, holders[0].proof))
+      .to.be.revertedWithCustomError(claim, "ClaimWindowClosed");
+    await claim.settleExpiredRounds();
+    expect(await token.balanceOf(DEAD_ADDRESS)).to.equal(allocation);
+    expect(await token.balanceOf(await claim.getAddress())).to.equal(0n);
+    expect(await claim.nextRoundToSettle()).to.equal(36n);
   });
 
   it("validates token, root, allocation and chronological round ends", async () => {
